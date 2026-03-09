@@ -1,9 +1,12 @@
 package com.scyborsa.api.controller;
 
+import com.scyborsa.api.dto.FintablesBrokerageDto;
 import com.scyborsa.api.dto.backoffice.BackofficeDashboardDto;
 import com.scyborsa.api.dto.backoffice.ScreenerResultSummaryDto;
 import com.scyborsa.api.dto.backoffice.StockDto;
+import com.scyborsa.api.service.AraciKurumService;
 import com.scyborsa.api.service.BackofficeService;
+import com.scyborsa.api.service.FintablesApiClient;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
@@ -28,6 +31,8 @@ import java.util.Map;
 public class BackofficeController {
 
     private final BackofficeService backofficeService;
+    private final FintablesApiClient fintablesApiClient;
+    private final AraciKurumService araciKurumService;
 
     /**
      * Dashboard KPI verilerini dondurur.
@@ -102,6 +107,28 @@ public class BackofficeController {
     public ResponseEntity<List<ScreenerResultSummaryDto>> getTodayScreenerResults() {
         List<ScreenerResultSummaryDto> results = backofficeService.getTodayScreenerResults();
         return ResponseEntity.ok(results);
+    }
+
+    /**
+     * Fintables'ten araci kurum listesini cekip DB'ye senkronize eder.
+     *
+     * <p>HTTP POST {@code /api/v1/backoffice/araci-kurum/sync}</p>
+     *
+     * @return senkronize edilen kurum sayisi
+     */
+    @PostMapping("/araci-kurum/sync")
+    public ResponseEntity<Map<String, Object>> syncBrokerages() {
+        try {
+            log.info("[BACKOFFICE] Manuel araci kurum sync tetiklendi");
+            java.util.List<FintablesBrokerageDto> brokerages = fintablesApiClient.getBrokerages();
+            araciKurumService.syncFromBrokerageList(brokerages);
+            log.info("[BACKOFFICE] Manuel araci kurum sync tamamlandi ({} kurum)", brokerages.size());
+            return ResponseEntity.ok(Map.of("status", "OK", "count", brokerages.size()));
+        } catch (Exception e) {
+            log.error("[BACKOFFICE] Manuel araci kurum sync hatasi", e);
+            return ResponseEntity.internalServerError()
+                    .body(Map.of("status", "ERROR", "message", e.getMessage()));
+        }
     }
 
     /**

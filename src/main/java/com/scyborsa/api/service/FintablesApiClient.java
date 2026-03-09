@@ -78,7 +78,13 @@ public class FintablesApiClient {
                 .url(fullUrl)
                 .get();
 
-        // Cookie header ile kimlik dogrulama (Cloudflare uyumlu)
+        // Bearer token ile kimlik dogrulama
+        String bearerToken = config.getBearerToken();
+        if (bearerToken != null && !bearerToken.isEmpty()) {
+            requestBuilder.addHeader("Authorization", "Bearer " + bearerToken);
+        }
+
+        // Cookie header ile kimlik dogrulama (Cloudflare uyumlu, fallback)
         String cookie = config.getCookie();
         if (cookie != null && !cookie.isEmpty()) {
             requestBuilder.addHeader("Cookie", cookie);
