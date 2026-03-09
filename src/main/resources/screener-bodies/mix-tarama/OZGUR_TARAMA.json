@@ -1,0 +1,308 @@
+{
+  "columns": [
+    "name",
+    "description",
+    "logoid",
+    "update_mode",
+    "type",
+    "typespecs",
+    "close",
+    "pricescale",
+    "minmov",
+    "fractional",
+    "minmove2",
+    "currency",
+    "change",
+    "volume",
+    "relative_volume_10d_calc",
+    "market_cap_basic",
+    "fundamental_currency_code",
+    "price_earnings_ttm",
+    "earnings_per_share_diluted_ttm",
+    "earnings_per_share_diluted_yoy_growth_ttm",
+    "dividends_yield_current",
+    "sector.tr",
+    "market",
+    "sector",
+    "recommendation_mark",
+    "exchange",
+    "ATR"
+  ],
+  "filter": [
+    {
+      "left": "close|60",
+      "operation": "greater",
+      "right": "EMA21|60"
+    },
+    {
+      "left": "RSI|60",
+      "operation": "greater",
+      "right": 50
+    },
+    {
+      "left": "Pivot.M.Classic.Middle|15",
+      "operation": "less",
+      "right": "close|15"
+    },
+    {
+      "left": "Mom|60",
+      "operation": "greater",
+      "right": 0
+    },
+    {
+      "left": "AO|60",
+      "operation": "greater",
+      "right": 0
+    },
+    {
+      "left": "UO|60",
+      "operation": "greater",
+      "right": 60
+    },
+    {
+      "left": "ROC|60",
+      "operation": "greater",
+      "right": 0
+    },
+    {
+      "left": "close",
+      "operation": "crosses_above",
+      "right": "EMA5"
+    },
+    {
+      "left": "ChaikinMoneyFlow|60",
+      "operation": "greater",
+      "right": 0.05
+    },
+    {
+      "left": "change",
+      "operation": "in_range",
+      "right": [
+        1,
+        7
+      ]
+    },
+    {
+      "left": "submarket",
+      "operation": "in_range",
+      "right": [
+        "STARS",
+        "MAIN"
+      ]
+    }
+  ],
+  "ignore_unknown_fields": false,
+  "options": {
+    "lang": "tr"
+  },
+  "range": [
+    0,
+    100
+  ],
+  "sort": {
+    "sortBy": "change",
+    "sortOrder": "asc"
+  },
+  "symbols": {},
+  "markets": [
+    "turkey"
+  ],
+  "filter2": {
+    "operator": "and",
+    "operands": [
+      {
+        "operation": {
+          "operator": "and",
+          "operands": [
+            {
+              "expression": {
+                "left": "Recommend.All",
+                "operation": "nequal",
+                "right": 0.5
+              }
+            }
+          ]
+        }
+      },
+      {
+        "operation": {
+          "operator": "or",
+          "operands": [
+            {
+              "expression": {
+                "left": "Recommend.All",
+                "operation": "in_range",
+                "right": [
+                  0.5,
+                  1
+                ]
+              }
+            }
+          ]
+        }
+      },
+      {
+        "operation": {
+          "operator": "and",
+          "operands": [
+            {
+              "expression": {
+                "left": "Recommend.MA",
+                "operation": "nequal",
+                "right": 0.5
+              }
+            }
+          ]
+        }
+      },
+      {
+        "operation": {
+          "operator": "or",
+          "operands": [
+            {
+              "expression": {
+                "left": "Recommend.MA",
+                "operation": "in_range",
+                "right": [
+                  0.5,
+                  1
+                ]
+              }
+            }
+          ]
+        }
+      },
+      {
+        "operation": {
+          "operator": "and",
+          "operands": [
+            {
+              "expression": {
+                "left": "Recommend.Other",
+                "operation": "nequal",
+                "right": 0.1
+              }
+            }
+          ]
+        }
+      },
+      {
+        "operation": {
+          "operator": "or",
+          "operands": [
+            {
+              "expression": {
+                "left": "Recommend.Other",
+                "operation": "in_range",
+                "right": [
+                  0.1,
+                  0.5
+                ]
+              }
+            },
+            {
+              "expression": {
+                "left": "Recommend.Other",
+                "operation": "in_range",
+                "right": [
+                  0.5,
+                  1
+                ]
+              }
+            }
+          ]
+        }
+      },
+      {
+        "operation": {
+          "operator": "or",
+          "operands": [
+            {
+              "operation": {
+                "operator": "and",
+                "operands": [
+                  {
+                    "expression": {
+                      "left": "type",
+                      "operation": "equal",
+                      "right": "stock"
+                    }
+                  },
+                  {
+                    "expression": {
+                      "left": "typespecs",
+                      "operation": "has",
+                      "right": [
+                        "common"
+                      ]
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "operation": {
+                "operator": "and",
+                "operands": [
+                  {
+                    "expression": {
+                      "left": "type",
+                      "operation": "equal",
+                      "right": "stock"
+                    }
+                  },
+                  {
+                    "expression": {
+                      "left": "typespecs",
+                      "operation": "has",
+                      "right": [
+                        "preferred"
+                      ]
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "operation": {
+                "operator": "and",
+                "operands": [
+                  {
+                    "expression": {
+                      "left": "type",
+                      "operation": "equal",
+                      "right": "dr"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "operation": {
+                "operator": "and",
+                "operands": [
+                  {
+                    "expression": {
+                      "left": "type",
+                      "operation": "equal",
+                      "right": "fund"
+                    }
+                  },
+                  {
+                    "expression": {
+                      "left": "typespecs",
+                      "operation": "has_none_of",
+                      "right": [
+                        "etf"
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

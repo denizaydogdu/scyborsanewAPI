@@ -1,0 +1,118 @@
+server:
+  port: 8081
+
+spring:
+  application:
+    name: scyborsaApi
+  task:
+    scheduling:
+      pool:
+        size: 3
+  datasource:
+    url: jdbc:postgresql://localhost:5432/scyborsa_db?currentSchema=public&ssl=false
+    username: ${DB_USERNAME:admin}
+    password: ${DB_PASSWORD:CHANGE_ME}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+  jpa:
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+
+kap:
+  cache:
+    ttl-minutes: 10
+  news:
+    api-url: https://news-mediator.tradingview.com/news-flow/v1/news
+    market-news-url: https://news-headlines.tradingview.com/v2/headlines
+    world-news-url: https://news-mediator.tradingview.com/news-flow/v1/news
+    logo-base-url: https://s3-symbol-logo.tradingview.com/
+    story-base-url: https://tr.tradingview.com
+    connect-timeout-seconds: 10
+    request-timeout-seconds: 15
+
+velzon:
+  api:
+    base-url: ${VELZON_API_URL:https://api.velzon.tr}
+    api-key: ${VELZON_API_KEY:CHANGE_ME}
+    connect-timeout-seconds: 10
+    request-timeout-seconds: 15
+
+cors:
+  allowed-origins: http://localhost:8080
+  max-age-seconds: 3600
+
+tradingview:
+  headers:
+    origin: https://tr.tradingview.com
+    referer: https://tr.tradingview.com/
+  http:
+    connect-timeout-seconds: 10
+    request-timeout-seconds: 15
+  chart:
+    websocket-wait-ms: 200
+  websocket:
+    auth:
+      token: ${TV_WS_AUTH_TOKEN:CHANGE_ME}
+    cookie:
+      value: ${TV_WS_COOKIE:CHANGE_ME}
+  auth:
+    token: ${TV_AUTH_TOKEN:CHANGE_ME}
+  screener:
+    url: https://scanner.tradingview.com/turkey/scan?label-product=screener-stock
+  cookie:
+    value: ${TV_COOKIE:CHANGE_ME}
+
+screener:
+  rate-limit-sleep-ms: 1500
+
+sector:
+  cache:
+    ttl-seconds: 120
+
+fund:
+  cache:
+    ttl-seconds: 120
+
+analyst-rating:
+  cache:
+    ttl-seconds: 86400
+
+fintables:
+  api:
+    base-url: https://api.fintables.com
+    bearer-token: ${FINTABLES_BEARER_TOKEN:CHANGE_ME}
+    cookie: ${FINTABLES_COOKIE:CHANGE_ME}
+    connect-timeout-seconds: 10
+    request-timeout-seconds: 15
+
+telegram:
+  enabled: ${TELEGRAM_ENABLED:false}
+  bot:
+    token: ${TELEGRAM_BOT_TOKEN:}
+    chat-id: ${TELEGRAM_CHAT_ID:}
+    topic-id: ${TELEGRAM_TOPIC_ID:0}
+  ai:
+    topic-id: ${TELEGRAM_AI_TOPIC_ID:8}
+    enabled: ${TELEGRAM_AI_ENABLED:false}
+    fallback-to-main: true
+  screenshot:
+    enabled: ${TELEGRAM_SCREENSHOT_ENABLED:false}
+  kgs:
+    filter-enabled: ${TELEGRAM_KGS_FILTER:false}
+    min-score: ${TELEGRAM_KGS_MIN_SCORE:70}
+  chart-base-url: "https://www.tradingview.com/chart/?symbol=BIST:"
+  send-rate-limit-ms: 200
+
+haber:
+  sync:
+    enabled: true
+    fixed-delay: 60000
+    max-fetch-per-cycle: 5
+    fetch-timeout: 10000
+    max-stored: 100
+    fetch-delay: 1000

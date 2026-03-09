@@ -1,0 +1,315 @@
+{
+  "columns": [
+    "name",
+    "description",
+    "logoid",
+    "update_mode",
+    "type",
+    "typespecs",
+    "close",
+    "pricescale",
+    "minmov",
+    "fractional",
+    "minmove2",
+    "currency",
+    "change",
+    "volume",
+    "relative_volume_10d_calc",
+    "market_cap_basic",
+    "fundamental_currency_code",
+    "price_earnings_ttm",
+    "earnings_per_share_diluted_ttm",
+    "earnings_per_share_diluted_yoy_growth_ttm",
+    "dividends_yield_current",
+    "sector.tr",
+    "market",
+    "sector",
+    "recommendation_mark",
+    "exchange",
+    "ATR"
+  ],
+  "filter": [
+    {
+      "left": "average_volume_10d_calc",
+      "operation": "greater",
+      "right": 1000000
+    },
+    {
+      "left": "Value.Traded",
+      "operation": "greater",
+      "right": 10000000
+    },
+    {
+      "left": "CCI20",
+      "operation": "greater",
+      "right": 100
+    },
+    {
+      "left": "Pivot.M.Classic.Middle|15",
+      "operation": "less",
+      "right": "close|15"
+    },
+    {
+      "left": "EMA5",
+      "operation": "greater",
+      "right": "EMA13"
+    },
+    {
+      "left": "EMA21|60",
+      "operation": "less",
+      "right": "close|60"
+    },
+    {
+      "left": "P.SAR",
+      "operation": "less",
+      "right": "close"
+    },
+    {
+      "left": "CCI20|60",
+      "operation": "greater",
+      "right": 100
+    },
+    {
+      "left": "volume_change",
+      "operation": "greater",
+      "right": 10
+    },
+    {
+      "left": "close",
+      "operation": "greater",
+      "right": "open"
+    },
+    {
+      "left": "close",
+      "operation": "greater",
+      "right": "open"
+    },
+    {
+      "left": "change",
+      "operation": "less",
+      "right": 6
+    },
+    {
+      "left": "submarket",
+      "operation": "in_range",
+      "right": [
+        "STARS",
+        "MAIN"
+      ]
+    }
+  ],
+  "ignore_unknown_fields": false,
+  "options": {
+    "lang": "tr"
+  },
+  "range": [
+    0,
+    100
+  ],
+  "sort": {
+    "sortBy": "change",
+    "sortOrder": "asc"
+  },
+  "symbols": {},
+  "markets": [
+    "turkey"
+  ],
+  "filter2": {
+    "operator": "and",
+    "operands": [
+      {
+        "operation": {
+          "operator": "and",
+          "operands": [
+            {
+              "expression": {
+                "left": "Recommend.All",
+                "operation": "nequal",
+                "right": 0.5
+              }
+            }
+          ]
+        }
+      },
+      {
+        "operation": {
+          "operator": "or",
+          "operands": [
+            {
+              "expression": {
+                "left": "Recommend.All",
+                "operation": "in_range",
+                "right": [
+                  0.5,
+                  1
+                ]
+              }
+            }
+          ]
+        }
+      },
+      {
+        "operation": {
+          "operator": "and",
+          "operands": [
+            {
+              "expression": {
+                "left": "Recommend.MA",
+                "operation": "nequal",
+                "right": 0.5
+              }
+            }
+          ]
+        }
+      },
+      {
+        "operation": {
+          "operator": "or",
+          "operands": [
+            {
+              "expression": {
+                "left": "Recommend.MA",
+                "operation": "in_range",
+                "right": [
+                  0.5,
+                  1
+                ]
+              }
+            }
+          ]
+        }
+      },
+      {
+        "operation": {
+          "operator": "and",
+          "operands": [
+            {
+              "expression": {
+                "left": "Recommend.Other",
+                "operation": "nequal",
+                "right": 0.1
+              }
+            }
+          ]
+        }
+      },
+      {
+        "operation": {
+          "operator": "or",
+          "operands": [
+            {
+              "expression": {
+                "left": "Recommend.Other",
+                "operation": "in_range",
+                "right": [
+                  0.1,
+                  0.5
+                ]
+              }
+            },
+            {
+              "expression": {
+                "left": "Recommend.Other",
+                "operation": "in_range",
+                "right": [
+                  0.5,
+                  1
+                ]
+              }
+            }
+          ]
+        }
+      },
+      {
+        "operation": {
+          "operator": "or",
+          "operands": [
+            {
+              "operation": {
+                "operator": "and",
+                "operands": [
+                  {
+                    "expression": {
+                      "left": "type",
+                      "operation": "equal",
+                      "right": "stock"
+                    }
+                  },
+                  {
+                    "expression": {
+                      "left": "typespecs",
+                      "operation": "has",
+                      "right": [
+                        "common"
+                      ]
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "operation": {
+                "operator": "and",
+                "operands": [
+                  {
+                    "expression": {
+                      "left": "type",
+                      "operation": "equal",
+                      "right": "stock"
+                    }
+                  },
+                  {
+                    "expression": {
+                      "left": "typespecs",
+                      "operation": "has",
+                      "right": [
+                        "preferred"
+                      ]
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "operation": {
+                "operator": "and",
+                "operands": [
+                  {
+                    "expression": {
+                      "left": "type",
+                      "operation": "equal",
+                      "right": "dr"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "operation": {
+                "operator": "and",
+                "operands": [
+                  {
+                    "expression": {
+                      "left": "type",
+                      "operation": "equal",
+                      "right": "fund"
+                    }
+                  },
+                  {
+                    "expression": {
+                      "left": "typespecs",
+                      "operation": "has_none_of",
+                      "right": [
+                        "etf"
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      }
+    ]
+  }
+}
