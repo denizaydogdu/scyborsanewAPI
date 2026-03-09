@@ -12,6 +12,7 @@ import org.springframework.context.annotation.Configuration;
  * <ul>
  *   <li>{@code fintables.api.base-url} - API temel URL'i</li>
  *   <li>{@code fintables.api.bearer-token} - JWT Bearer token</li>
+ *   <li>{@code fintables.api.akd-token} - AKD endpoint'i icin ayri JWT Bearer token</li>
  *   <li>{@code fintables.api.connect-timeout-seconds} - HTTP client baglanti zaman asimi (varsayilan: 10)</li>
  *   <li>{@code fintables.api.request-timeout-seconds} - HTTP client istek zaman asimi (varsayilan: 15)</li>
  * </ul>
@@ -24,6 +25,9 @@ public class FintablesApiConfig {
 
     private String baseUrl;
     private String bearerToken;
+
+    /** AKD (Araci Kurum Dagilimi) endpoint'i icin ayri JWT Bearer token. */
+    private String akdToken;
 
     /** Fintables API cookie (auth-token + tracking). */
     private String cookie;

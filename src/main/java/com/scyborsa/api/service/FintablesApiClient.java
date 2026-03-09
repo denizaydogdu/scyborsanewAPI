@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.scyborsa.api.config.FintablesApiConfig;
 import com.scyborsa.api.dto.FintablesBrokerageDto;
+import com.scyborsa.api.dto.enrichment.FintablesAkdResponseDto;
 import lombok.extern.slf4j.Slf4j;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
@@ -11,6 +12,8 @@ import okhttp3.Response;
 import org.springframework.stereotype.Service;
 
 import java.net.URI;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
@@ -76,7 +79,10 @@ public class FintablesApiClient {
 
         Request.Builder requestBuilder = new Request.Builder()
                 .url(fullUrl)
-                .get();
+                .get()
+                .addHeader("Origin", "https://fintables.com")
+                .addHeader("Referer", "https://fintables.com/")
+                .addHeader("Accept", "application/json, text/plain, */*");
 
         // Bearer token ile kimlik dogrulama
         String bearerToken = config.getBearerToken();
@@ -131,5 +137,60 @@ public class FintablesApiClient {
     public List<FintablesBrokerageDto> getBrokerages() throws Exception {
         log.debug("Fintables brokerages listesi aliniyor");
         return get("/brokerages/", new TypeReference<>() {});
+    }
+
+    /**
+     * Hisse bazlı AKD (Aracı Kurum Dağılımı) verisini Fintables'ten getirir.
+     * AKD endpoint'i ayri bir JWT token gerektirir ({@code fintables.api.akd-token}).
+     *
+     * @param company hisse kodu (ör: "GARAN")
+     * @param start   başlangıç tarihi (yyyy-MM-dd formatında)
+     * @param end     bitiş tarihi (yyyy-MM-dd formatında)
+     * @return AKD response DTO'su
+     * @throws Exception API çağrısı başarısız olursa
+     */
+    public FintablesAkdResponseDto getAkd(String company, String start, String end) throws Exception {
+        String url = "/mobile/akd/?company=" + URLEncoder.encode(company, StandardCharsets.UTF_8)
+                + "&start=" + URLEncoder.encode(start, StandardCharsets.UTF_8)
+                + "&end=" + URLEncoder.encode(end, StandardCharsets.UTF_8);
+        String body = getWithToken(url, config.getAkdToken());
+        return objectMapper.readValue(body, new TypeReference<>() {});
+    }
+
+    /**
+     * Belirtilen URL'ye ozel bir Bearer token ile GET istegi yapar.
+     *
+     * @param url   API URL'i (path)
+     * @param token kullanilacak Bearer token
+     * @return ham JSON response body string'i
+     * @throws RuntimeException HTTP status 200 degilse
+     * @throws Exception        baglanti veya I/O hatasi durumunda
+     */
+    private String getWithToken(String url, String token) throws Exception {
+        String fullUrl = config.getBaseUrl() + url;
+
+        log.debug("Fintables API GET (custom token): {}", fullUrl);
+
+        Request.Builder requestBuilder = new Request.Builder()
+                .url(fullUrl)
+                .get()
+                .addHeader("Origin", "https://fintables.com")
+                .addHeader("Referer", "https://fintables.com/")
+                .addHeader("Accept", "application/json, text/plain, */*");
+
+        if (token != null && !token.isEmpty()) {
+            requestBuilder.addHeader("Authorization", "Bearer " + token);
+        }
+
+        Request request = requestBuilder.build();
+
+        try (Response response = httpClient.newCall(request).execute()) {
+            int statusCode = response.code();
+            if (statusCode != 200) {
+                log.error("Fintables API hatasi: status={}, url={}", statusCode, fullUrl);
+                throw new RuntimeException("Fintables API hatasi: " + statusCode);
+            }
+            return response.body() != null ? response.body().string() : "";
+        }
     }
 }
