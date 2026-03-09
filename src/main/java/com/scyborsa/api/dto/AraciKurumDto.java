@@ -34,6 +34,12 @@ public class AraciKurumDto {
     /** Araci kurum logo URL'i. */
     private String logoUrl;
 
+    /** Araci kurumun bagli oldugu halka acik sirket. Orn: "ISMEN", "GARAN". */
+    private String publicCompany;
+
+    /** Araci kurumun borsada islem gorup gormedigini belirtir. */
+    private Boolean isListed;
+
     /** Araci kurumun aktif olup olmadigini belirtir. */
     private Boolean aktif;
 

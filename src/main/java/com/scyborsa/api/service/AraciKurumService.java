@@ -1,6 +1,7 @@
 package com.scyborsa.api.service;
 
 import com.scyborsa.api.dto.AraciKurumDto;
+import com.scyborsa.api.dto.FintablesBrokerageDto;
 import com.scyborsa.api.dto.analyst.AnalystRatingDto;
 import com.scyborsa.api.model.AraciKurum;
 import com.scyborsa.api.repository.AraciKurumRepository;
@@ -104,6 +105,82 @@ public class AraciKurumService {
                 newCount, updatedCount, uniqueBrokerages.size());
     }
 
+    /**
+     * Fintables brokerage listesinden araci kurum bilgilerini sync eder.
+     *
+     * <p>Gelen brokerage listesindeki bilgileri veritabanindaki araci kurum
+     * kayitlari ile eslestirir. Yeni kurumlar olusturulur, mevcut kurumlarin
+     * title/shortTitle/logoUrl/publicCompany/isListed alanlari guncellenir.
+     * {@code aktif} ve {@code siraNo} alanlari korunur — kullanici tarafindan yonetilir.</p>
+     *
+     * @param brokerages Fintables'dan gelen araci kurum listesi
+     */
+    @Transactional
+    public void syncFromBrokerageList(List<FintablesBrokerageDto> brokerages) {
+        if (brokerages == null || brokerages.isEmpty()) {
+            log.debug("[ARACI-KURUM] Brokerage listesi bos, atlanıyor");
+            return;
+        }
+
+        // Benzersiz brokerage'lari code'a gore topla (son gelen kazanir)
+        Map<String, FintablesBrokerageDto> uniqueBrokerages = new LinkedHashMap<>();
+        for (FintablesBrokerageDto b : brokerages) {
+            if (b.getCode() != null && !b.getCode().isBlank()) {
+                uniqueBrokerages.put(b.getCode(), b);
+            }
+        }
+
+        // Tum mevcut kurumlari tek sorguda getir (N+1 onleme)
+        Map<String, AraciKurum> existingByCode = araciKurumRepository
+                .findByCodeIn(uniqueBrokerages.keySet()).stream()
+                .collect(Collectors.toMap(AraciKurum::getCode, Function.identity()));
+
+        int newCount = 0;
+        int updatedCount = 0;
+        List<AraciKurum> toSave = new ArrayList<>();
+
+        for (Map.Entry<String, FintablesBrokerageDto> entry : uniqueBrokerages.entrySet()) {
+            String code = entry.getKey();
+            FintablesBrokerageDto brokerage = entry.getValue();
+
+            AraciKurum existing = existingByCode.get(code);
+            if (existing != null) {
+                // Sadece degisen alanlari guncelle (gereksiz UPDATE onleme)
+                boolean dirty = !Objects.equals(existing.getTitle(), brokerage.getTitle())
+                        || !Objects.equals(existing.getShortTitle(), brokerage.getShortTitle())
+                        || !Objects.equals(existing.getLogoUrl(), brokerage.getLogo())
+                        || !Objects.equals(existing.getPublicCompany(), brokerage.getPublicCompany())
+                        || !Objects.equals(existing.getIsListed(), brokerage.getIsListed());
+                if (dirty) {
+                    existing.setTitle(brokerage.getTitle());
+                    existing.setShortTitle(brokerage.getShortTitle());
+                    existing.setLogoUrl(brokerage.getLogo());
+                    existing.setPublicCompany(brokerage.getPublicCompany());
+                    existing.setIsListed(brokerage.getIsListed());
+                    // aktif ve siraNo korunur — kullanici tarafindan yonetilir
+                    toSave.add(existing);
+                    updatedCount++;
+                }
+            } else {
+                AraciKurum yeniKurum = AraciKurum.builder()
+                        .code(code)
+                        .title(brokerage.getTitle())
+                        .shortTitle(brokerage.getShortTitle())
+                        .logoUrl(brokerage.getLogo())
+                        .publicCompany(brokerage.getPublicCompany())
+                        .isListed(brokerage.getIsListed())
+                        .aktif(true)
+                        .build();
+                toSave.add(yeniKurum);
+                newCount++;
+            }
+        }
+
+        araciKurumRepository.saveAll(toSave);
+        log.info("[ARACI-KURUM] Brokerage sync: {} yeni, {} guncellenen (toplam {} benzersiz kurum)",
+                newCount, updatedCount, uniqueBrokerages.size());
+    }
+
     // --- CRUD metodlari (backoffice endpoint'leri eklendiginde kullanilacak) ---
 
     /**
@@ -157,6 +234,8 @@ public class AraciKurumService {
                 .title(dto.getTitle())
                 .shortTitle(dto.getShortTitle())
                 .logoUrl(dto.getLogoUrl())
+                .publicCompany(dto.getPublicCompany())
+                .isListed(dto.getIsListed())
                 .aktif(dto.getAktif() != null ? dto.getAktif() : true)
                 .siraNo(dto.getSiraNo())
                 .build();
@@ -185,6 +264,8 @@ public class AraciKurumService {
         kurum.setTitle(dto.getTitle());
         kurum.setShortTitle(dto.getShortTitle());
         kurum.setLogoUrl(dto.getLogoUrl());
+        kurum.setPublicCompany(dto.getPublicCompany());
+        kurum.setIsListed(dto.getIsListed());
         if (dto.getAktif() != null) kurum.setAktif(dto.getAktif());
         if (dto.getSiraNo() != null) kurum.setSiraNo(dto.getSiraNo());
         AraciKurum saved = araciKurumRepository.save(kurum);
@@ -240,6 +321,8 @@ public class AraciKurumService {
                 .title(entity.getTitle())
                 .shortTitle(entity.getShortTitle())
                 .logoUrl(entity.getLogoUrl())
+                .publicCompany(entity.getPublicCompany())
+                .isListed(entity.getIsListed())
                 .aktif(entity.getAktif())
                 .siraNo(entity.getSiraNo())
                 .build();

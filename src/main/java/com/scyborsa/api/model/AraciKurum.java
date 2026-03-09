@@ -49,6 +49,14 @@ public class AraciKurum {
     @Column(name = "logo_url", length = 500)
     private String logoUrl;
 
+    /** Araci kurumun bagli oldugu halka acik sirket. Orn: "ISMEN", "GARAN". */
+    @Column(name = "public_company", length = 20)
+    private String publicCompany;
+
+    /** Araci kurumun borsada islem gorup gormedigini belirtir. */
+    @Column(name = "is_listed")
+    private Boolean isListed;
+
     /** Araci kurumun aktif/pasif durumu. Soft delete icin kullanilir. */
     @Column(name = "aktif", nullable = false)
     private Boolean aktif = true;

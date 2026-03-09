@@ -3,6 +3,7 @@ package com.scyborsa.api.service;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.scyborsa.api.config.FintablesApiConfig;
+import com.scyborsa.api.dto.FintablesBrokerageDto;
 import lombok.extern.slf4j.Slf4j;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
@@ -10,6 +11,7 @@ import okhttp3.Response;
 import org.springframework.stereotype.Service;
 
 import java.net.URI;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -109,5 +111,19 @@ public class FintablesApiClient {
     public <T> T get(String url, TypeReference<T> typeRef) throws Exception {
         String body = get(url);
         return objectMapper.readValue(body, typeRef);
+    }
+
+    /**
+     * Fintables araci kurum listesini getirir.
+     *
+     * <p>{@code /brokerages/} endpoint'ine GET istegi yaparak
+     * tum araci kurum bilgilerini dondurur.</p>
+     *
+     * @return araci kurum DTO listesi
+     * @throws Exception baglanti, I/O veya JSON parse hatasi durumunda
+     */
+    public List<FintablesBrokerageDto> getBrokerages() throws Exception {
+        log.debug("Fintables brokerages listesi aliniyor");
+        return get("/brokerages/", new TypeReference<>() {});
     }
 }
