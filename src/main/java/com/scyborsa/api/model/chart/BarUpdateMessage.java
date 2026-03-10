@@ -48,4 +48,7 @@ public class BarUpdateMessage {
 
     /** Sunucu zamanı (epoch milisaniye). Client-server zaman senkronizasyonu için kullanılır. */
     private long serverTime;
+
+    /** Borsa seansının açık olup olmadığını belirtir. {@code null} ise bilgi mevcut değildir. */
+    private Boolean marketOpen;
 }

@@ -16,7 +16,33 @@ public final class BistTradingCalendar {
 
     private static final ZoneId ISTANBUL_ZONE = ZoneId.of("Europe/Istanbul");
 
+    /** BIST veri akışı başlangıç saati (açılış seansı + veri gecikmesi). */
+    private static final LocalTime MARKET_OPEN_TIME = LocalTime.of(9, 55);
+
+    /** BIST veri akışı bitiş saati (kapanış seansı 18:10 + ~15dk veri gecikmesi). */
+    private static final LocalTime MARKET_CLOSE_TIME = LocalTime.of(18, 25);
+
     private BistTradingCalendar() {
+    }
+
+    /**
+     * Borsanin su an acik olup olmadigini kontrol eder.
+     *
+     * <p>{@link #isNotOffDay()} kontrolüne ek olarak normal islem saatlerini
+     * (10:00-18:10) de dikkate alir. Chart subscription lifecycle gibi
+     * market-aware islemler icin kullanilmalidir.</p>
+     *
+     * <p>Not: Scheduled job'lar icin {@link #isNotOffDay()} tercih edilmelidir
+     * çünkü job'lar kendi cron zamanlama ile çalisir.</p>
+     *
+     * @return borsa su an aciksa {@code true}
+     */
+    public static boolean isMarketOpen() {
+        if (!isNotOffDay()) {
+            return false;
+        }
+        LocalTime now = LocalTime.now(ISTANBUL_ZONE);
+        return !now.isBefore(MARKET_OPEN_TIME) && !now.isAfter(MARKET_CLOSE_TIME);
     }
 
     /**

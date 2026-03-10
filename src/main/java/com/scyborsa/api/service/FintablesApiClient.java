@@ -5,6 +5,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.scyborsa.api.config.FintablesApiConfig;
 import com.scyborsa.api.dto.FintablesBrokerageDto;
 import com.scyborsa.api.dto.enrichment.FintablesAkdResponseDto;
+import com.scyborsa.api.dto.enrichment.FintablesBrokerageAkdDetailDto;
+import com.scyborsa.api.dto.enrichment.FintablesBrokerageAkdListDto;
 import com.scyborsa.api.dto.enrichment.FintablesTakasResponseDto;
 import lombok.extern.slf4j.Slf4j;
 import okhttp3.OkHttpClient;
@@ -173,6 +175,44 @@ public class FintablesApiClient {
                 + "&date=" + URLEncoder.encode(date, StandardCharsets.UTF_8);
         String body = getWithToken(url, config.getTakasToken());
         return objectMapper.readValue(body, new TypeReference<>() {});
+    }
+
+    /**
+     * Fintables piyasa geneli AKD araci kurum dagilim listesini getirir.
+     *
+     * @param start baslangic tarihi (YYYY-MM-DD)
+     * @param end   bitis tarihi (YYYY-MM-DD)
+     * @return araci kurum AKD dagilim listesi
+     * @throws Exception API cagrisi basarisiz olursa
+     */
+    public FintablesBrokerageAkdListDto getBrokerageAkdList(String start, String end) throws Exception {
+        String url = "/mobile/brokerages/akd/list/?start="
+                + URLEncoder.encode(start, StandardCharsets.UTF_8)
+                + "&end=" + URLEncoder.encode(end, StandardCharsets.UTF_8);
+        String body = getWithToken(url, config.getBrokerageToken());
+        return objectMapper.readValue(body, new TypeReference<>() {});
+    }
+
+    /**
+     * Belirli bir aracı kurumun hisse bazlı AKD dağılımını getirir.
+     *
+     * <p>{@code /mobile/brokerages/akd/} endpoint'ine kurum kodu ve tarih parametreleri ile
+     * GET istegi yaparak hisse bazli alis/satis/net/toplam islem verilerini dondurur.</p>
+     *
+     * @param brokerage kurum kodu (MLB, YKR vb.)
+     * @param start     başlangıç tarihi (YYYY-MM-DD)
+     * @param end       bitiş tarihi (YYYY-MM-DD)
+     * @return hisse bazlı AKD dağılım verisi
+     * @throws Exception API çağrısı başarısız olursa
+     */
+    public FintablesBrokerageAkdDetailDto getBrokerageAkdDetail(String brokerage, String start, String end)
+            throws Exception {
+        String url = "/mobile/brokerages/akd/?brokerage="
+                + URLEncoder.encode(brokerage, StandardCharsets.UTF_8)
+                + "&start=" + URLEncoder.encode(start, StandardCharsets.UTF_8)
+                + "&end=" + URLEncoder.encode(end, StandardCharsets.UTF_8);
+        String body = getWithToken(url, config.getBrokerageToken());
+        return objectMapper.readValue(body, FintablesBrokerageAkdDetailDto.class);
     }
 
     /**

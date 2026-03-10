@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Mum grafigi (candlestick) bar verilerini ve fiyat kotasyonlarini WebSocket üzerinden yayinlayan servis.
@@ -99,6 +100,26 @@ public class BarBroadcastService {
         String topic = "/topic/price/" + clean;
         messagingTemplate.convertAndSend(topic, quoteData);
         log.debug("[BROADCAST] Quote update: {} -> {}", clean, topic);
+    }
+
+    /**
+     * Seans kapanisi mesajini tüm aktif topic'lere yayinlar.
+     *
+     * <p>{@code type="session_closed"} ve {@code marketOpen=false} iceren mesaj gönderir.
+     * Frontend bu mesaji aldiginda "Seans Kapali" badge'ini gösterir.</p>
+     *
+     * @param activeTopics yayinlanacak STOMP topic path'leri
+     */
+    public void broadcastSessionClosed(Set<String> activeTopics) {
+        for (String topic : activeTopics) {
+            BarUpdateMessage msg = BarUpdateMessage.builder()
+                    .type("session_closed")
+                    .marketOpen(false)
+                    .serverTime(System.currentTimeMillis())
+                    .build();
+            messagingTemplate.convertAndSend(topic, msg);
+        }
+        log.info("[BROADCAST] Seans kapanış mesajı gönderildi: {} topic", activeTopics.size());
     }
 
     private String buildTopic(String symbol, String period) {

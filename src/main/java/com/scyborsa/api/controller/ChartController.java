@@ -3,6 +3,7 @@ package com.scyborsa.api.controller;
 import com.scyborsa.api.model.chart.BarUpdateMessage;
 import com.scyborsa.api.model.chart.CandleBar;
 import com.scyborsa.api.service.chart.TradingViewBarService;
+import com.scyborsa.api.utils.BistTradingCalendar;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
@@ -64,6 +65,7 @@ public class ChartController {
                     .bars(result)
                     .totalBars(result.size())
                     .serverTime(System.currentTimeMillis())
+                    .marketOpen(BistTradingCalendar.isMarketOpen())
                     .build();
 
             return ResponseEntity.ok(response);

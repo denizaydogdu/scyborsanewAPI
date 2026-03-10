@@ -332,4 +332,35 @@ public class BarCache {
     public Collection<SymbolSubscription> getAllSubscriptions() {
         return cache.values();
     }
+
+    /**
+     * Cache'teki tüm aktif subscription'lar icin STOMP topic path'lerini döner.
+     *
+     * <p>Her subscription icin bar topic ({@code /topic/bars/{symbol}/{period}}) ve
+     * fiyat topic ({@code /topic/price/{symbol}}) üretilir.</p>
+     *
+     * @return aktif topic path'leri; cache bossa bos set
+     */
+    public Set<String> getAllActiveTopics() {
+        Set<String> topics = new HashSet<>();
+        for (SymbolSubscription sub : cache.values()) {
+            String clean = cleanSymbol(sub.getSymbol());
+            topics.add("/topic/bars/" + clean + "/" + sub.getPeriod());
+            topics.add("/topic/price/" + clean);
+        }
+        return topics;
+    }
+
+    /**
+     * Sembol adindaki exchange prefix'ini cikarir (ör. "BIST:THYAO" → "THYAO").
+     *
+     * @param symbol tam sembol adi
+     * @return temizlenmis sembol
+     */
+    private String cleanSymbol(String symbol) {
+        if (symbol != null && symbol.contains(":")) {
+            return symbol.substring(symbol.indexOf(':') + 1);
+        }
+        return symbol;
+    }
 }

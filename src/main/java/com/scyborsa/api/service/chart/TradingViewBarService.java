@@ -4,6 +4,7 @@ import com.scyborsa.api.config.TradingViewConfig;
 import com.scyborsa.api.constants.TradingViewConstant;
 import com.scyborsa.api.model.chart.CandleBar;
 import com.scyborsa.api.model.chart.SymbolSubscription;
+import com.scyborsa.api.utils.BistTradingCalendar;
 import com.scyborsa.api.websocket.TradingViewBarWebSocketClient;
 import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
@@ -46,6 +47,9 @@ public class TradingViewBarService {
     private final BarBroadcastService broadcastService;
 
     private volatile TradingViewBarWebSocketClient wsClient;
+
+    /** Seans açık→kapalı geçişini tespit etmek için önceki durum. */
+    private volatile boolean marketWasOpen = false;
 
     /**
      * Constructor injection ile bagimliliklari alir.
@@ -133,24 +137,37 @@ public class TradingViewBarService {
      * @param bars   istenen bar sayisi
      * @return bar listesi iceren future; hata durumunda failed future
      */
-    public synchronized CompletableFuture<List<CandleBar>> getBars(String symbol, String period, int bars) {
+    public CompletableFuture<List<CandleBar>> getBars(String symbol, String period, int bars) {
         String symbolFull = symbol.contains(":") ? symbol : "BIST:" + symbol;
 
+        // 1) Cache varsa → market açık/kapalı farketmez, anında dön
         List<CandleBar> cached = barCache.getBars(symbolFull, period);
         if (cached != null && !cached.isEmpty()) {
             return CompletableFuture.completedFuture(cached);
         }
 
+        // 2) Bekleyen subscription varsa onun future'ini dön
         SymbolSubscription existing = barCache.getSubscription(symbolFull, period);
         if (existing != null && existing.getInitialLoadFuture() != null) {
             return existing.getInitialLoadFuture();
         }
 
-        if (!isConnected()) {
-            connect();
+        // 3) Cache yok — market kapalıysa one-shot fetch (live subscription açma)
+        if (!BistTradingCalendar.isMarketOpen()) {
+            log.info("[BAR-SERVICE] Seans kapalı, one-shot fetch: {}:{}", symbolFull, period);
+            return fetchOneShotBars(symbolFull, period, bars);
         }
 
-        TradingViewBarWebSocketClient client = this.wsClient;
+        // 4) Cache yok + market açık → normal subscription akışı
+        // synchronized sadece connect + subscribe state mutation için
+        TradingViewBarWebSocketClient client;
+        synchronized (this) {
+            if (!isConnected()) {
+                connect();
+            }
+            client = this.wsClient;
+        }
+
         if (client == null) {
             return CompletableFuture.failedFuture(new RuntimeException("WebSocket bağlanamadı"));
         }
@@ -164,6 +181,7 @@ public class TradingViewBarService {
             return CompletableFuture.failedFuture(new RuntimeException("Subscription oluşturulamadı"));
         }
 
+        // Bağlantı henüz hazır değil — async bekle (lock TUTULMAZ, deadlock riski yok)
         CompletableFuture<List<CandleBar>> future = new CompletableFuture<>();
         CompletableFuture.runAsync(() -> {
             try {
@@ -353,13 +371,132 @@ public class TradingViewBarService {
     }
 
     /**
+     * Seans kapaliyken one-shot TradingView fetch yapar: bağlan → veri çek → cache → disconnect.
+     *
+     * <p>Normal subscription'dan farki: initial bars alindiktan sonra subscription
+     * otomatik kaldirilir ve WebSocket kapatilir. Live update akisi baslatilmaz.</p>
+     *
+     * @param symbolFull sembol (ör. "BIST:THYAO")
+     * @param period     periyot
+     * @param bars       istenen bar sayisi
+     * @return bar listesi iceren future
+     */
+    private CompletableFuture<List<CandleBar>> fetchOneShotBars(String symbolFull, String period, int bars) {
+        if (!isConnected()) {
+            connect();
+        }
+
+        TradingViewBarWebSocketClient client = this.wsClient;
+        if (client == null) {
+            return CompletableFuture.failedFuture(new RuntimeException("WebSocket bağlanamadı (one-shot)"));
+        }
+
+        CompletableFuture<List<CandleBar>> future = new CompletableFuture<>();
+        CompletableFuture.runAsync(() -> {
+            try {
+                // Bağlantı hazır olmasını bekle
+                for (int i = 0; i < 50 && !client.isConnected(); i++) {
+                    Thread.sleep(config.getChartWebsocketWaitMs());
+                }
+                if (!client.isConnected()) {
+                    future.completeExceptionally(new RuntimeException("WebSocket bağlantı zaman aşımı (one-shot)"));
+                    return;
+                }
+
+                // Subscription başlat
+                client.subscribeToBar(symbolFull, period, bars);
+                SymbolSubscription sub = barCache.getSubscription(symbolFull, period);
+                if (sub == null || sub.getInitialLoadFuture() == null) {
+                    future.completeExceptionally(new RuntimeException("Subscription oluşturulamadı (one-shot)"));
+                    return;
+                }
+
+                // Initial bars gelince → cache'e yazılır (barCache.onInitialBars tarafından)
+                // Sonra subscription kaldır + disconnect
+                sub.getInitialLoadFuture().whenComplete((result, ex) -> {
+                    // Diğer subscription sayısını ÖNCE kontrol et (unsubscribe cache'i değiştirir)
+                    long otherSubs = barCache.getAllSubscriptions().stream()
+                            .filter(s -> !(s.getSymbol().equals(symbolFull) && s.getPeriod().equals(period)))
+                            .count();
+
+                    // One-shot: veri alındı, subscription kaldır
+                    if (client.isConnected()) {
+                        client.unsubscribeFromBar(symbolFull, period);
+                    }
+
+                    // Başka aktif subscription yoksa disconnect
+                    if (otherSubs == 0) {
+                        disconnectFromTradingView();
+                    }
+
+                    if (ex != null) {
+                        future.completeExceptionally(ex);
+                    } else {
+                        future.complete(result);
+                    }
+                });
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                future.completeExceptionally(e);
+            }
+        });
+        return future;
+    }
+
+    /**
+     * Her dakika seans kapanis gecisini kontrol eder.
+     *
+     * <p>Seans acik→kapali gecisi tespit edildiginde tüm aktif topic'lere
+     * {@code session_closed} mesaji gönderilir ve TradingView baglantisi kesilir.
+     * Cache korunur — kapanistan sonra gelen kullanicilara cache'den servis edilir.</p>
+     */
+    @Scheduled(fixedDelay = 60000)
+    public void checkMarketClose() {
+        boolean marketNowOpen = BistTradingCalendar.isMarketOpen();
+
+        if (marketNowOpen) {
+            marketWasOpen = true;
+            return;
+        }
+
+        // Zaten kapalıydı — transition yok
+        if (!marketWasOpen) {
+            return;
+        }
+
+        // TRANSITION: Market açık→kapalı
+        marketWasOpen = false;
+        log.info("[CHART] Seans kapandı — cleanup başlatılıyor");
+
+        Set<String> activeTopics = barCache.getAllActiveTopics();
+        if (!activeTopics.isEmpty()) {
+            broadcastService.broadcastSessionClosed(activeTopics);
+        }
+
+        disconnectFromTradingView();
+    }
+
+    /**
+     * TradingView WebSocket baglantisini kapatir ama cache'i korur.
+     *
+     * <p>Seans kapanisinda cagirilir. Bekleyen future'lar basarisiz olarak tamamlanir
+     * ama cache'teki bar verileri silinmez — sonraki kullanicilar cache'den servis edilir.</p>
+     */
+    private void disconnectFromTradingView() {
+        log.info("[CHART] TradingView disconnect (cache korunuyor)");
+        barCache.failAllPendingFutures("Seans kapandı");
+        disconnect();
+    }
+
+    /**
      * Servisin anlik durum bilgisini döner (debug/monitoring amacli).
      *
-     * @return baglanti durumu ve cache bilgilerini iceren map
+     * @return baglanti durumu, market durumu ve cache bilgilerini iceren map
      */
     public Map<String, Object> getStatus() {
         Map<String, Object> status = new LinkedHashMap<>();
         status.put("connected", isConnected());
+        status.put("marketOpen", BistTradingCalendar.isMarketOpen());
         status.put("cache", barCache.getStatus());
         return status;
     }
