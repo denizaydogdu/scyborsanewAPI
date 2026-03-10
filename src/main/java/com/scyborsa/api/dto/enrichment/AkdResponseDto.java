@@ -25,4 +25,10 @@ public class AkdResponseDto {
 
     /** Tüm kurumlar toplam işlem hacmine göre (büyükten küçüğe sıralı). */
     private List<AkdBrokerDto> toplam;
+
+    /** Verinin ait olduğu tarih (yyyy-MM-dd formatında). */
+    private String dataDate;
+
+    /** Formatlanmış tarih (ör: "11 Mart 2026"). */
+    private String formattedDataDate;
 }

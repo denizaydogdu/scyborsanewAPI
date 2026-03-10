@@ -87,6 +87,7 @@ fintables:
     base-url: https://api.fintables.com
     bearer-token: ${FINTABLES_BEARER_TOKEN:CHANGE_ME}
     akd-token: ${FINTABLES_AKD_TOKEN:CHANGE_ME}
+    takas-token: ${FINTABLES_TAKAS_TOKEN:CHANGE_ME}
     cookie: ${FINTABLES_COOKIE:CHANGE_ME}
     connect-timeout-seconds: 10
     request-timeout-seconds: 15

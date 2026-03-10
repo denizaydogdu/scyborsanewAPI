@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.scyborsa.api.config.FintablesApiConfig;
 import com.scyborsa.api.dto.FintablesBrokerageDto;
 import com.scyborsa.api.dto.enrichment.FintablesAkdResponseDto;
+import com.scyborsa.api.dto.enrichment.FintablesTakasResponseDto;
 import lombok.extern.slf4j.Slf4j;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
@@ -158,6 +159,23 @@ public class FintablesApiClient {
     }
 
     /**
+     * Hisse bazlı Takas (saklama dağılımı) verisini Fintables'ten getirir.
+     * Takas endpoint'i ayrı bir JWT token gerektirir ({@code fintables.api.takas-token}).
+     *
+     * @param stockCode hisse kodu (ör: "GARAN")
+     * @param date      tarih (yyyy-MM-dd formatında)
+     * @return Takas raw response DTO'su
+     * @throws Exception API çağrısı başarısız olursa
+     */
+    public FintablesTakasResponseDto getTakas(String stockCode, String date) throws Exception {
+        String url = "/mobile/custodies/?index=custodian&code="
+                + URLEncoder.encode(stockCode, StandardCharsets.UTF_8)
+                + "&date=" + URLEncoder.encode(date, StandardCharsets.UTF_8);
+        String body = getWithToken(url, config.getTakasToken());
+        return objectMapper.readValue(body, new TypeReference<>() {});
+    }
+
+    /**
      * Belirtilen URL'ye ozel bir Bearer token ile GET istegi yapar.
      *
      * @param url   API URL'i (path)
@@ -168,6 +186,13 @@ public class FintablesApiClient {
      */
     private String getWithToken(String url, String token) throws Exception {
         String fullUrl = config.getBaseUrl() + url;
+
+        // SSRF korunma: sadece konfigure edilen domain'e istek yapilabilir
+        URI baseUri = URI.create(config.getBaseUrl());
+        URI requestUri = URI.create(fullUrl);
+        if (!requestUri.getHost().equals(baseUri.getHost())) {
+            throw new IllegalArgumentException("Gecersiz API URL: beklenmeyen domain");
+        }
 
         log.debug("Fintables API GET (custom token): {}", fullUrl);
 
@@ -180,6 +205,12 @@ public class FintablesApiClient {
 
         if (token != null && !token.isEmpty()) {
             requestBuilder.addHeader("Authorization", "Bearer " + token);
+        }
+
+        // Cookie header (Cloudflare uyumlu, get() ile tutarli)
+        String cookie = config.getCookie();
+        if (cookie != null && !cookie.isEmpty()) {
+            requestBuilder.addHeader("Cookie", cookie);
         }
 
         Request request = requestBuilder.build();
