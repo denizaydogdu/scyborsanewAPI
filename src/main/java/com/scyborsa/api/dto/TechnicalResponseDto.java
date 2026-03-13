@@ -14,7 +14,7 @@ import java.util.Map;
  * her periyot için ayrı bir instance oluşturulur.
  * </p>
  *
- * @see TvScreenerResponseModel
+ * @see com.scyborsa.api.dto.screener.TvScreenerResponseModel
  */
 @Data
 @AllArgsConstructor

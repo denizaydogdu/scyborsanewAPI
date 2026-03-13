@@ -66,11 +66,19 @@ public enum SessionHolidays {
     Time_20271029("20271029", false, null),
     Time_20271231("20271231", true, LocalTime.of(13, 0));
 
+    /** Tatil tarihi (yyyyMMdd formati, orn. "20250423"). */
     private final String dateStr;
+
+    /** Yarim gun (arefe) tatili mi? */
     private final boolean halfDay;
+
+    /** Yarim gun kapanis saati (tam gun tatillerde null). */
     private final LocalTime closingTime;
 
+    /** Tarih format deseni (yyyyMMdd). */
     private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("yyyyMMdd");
+
+    /** Istanbul saat dilimi. */
     private static final ZoneId ISTANBUL_ZONE = ZoneId.of("Europe/Istanbul");
 
     SessionHolidays(String dateStr, boolean halfDay, LocalTime closingTime) {

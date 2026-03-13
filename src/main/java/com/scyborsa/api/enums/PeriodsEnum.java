@@ -31,7 +31,10 @@ public enum PeriodsEnum {
     NO_TIME("NO_TIME", "NO_TIME"),
     NO_TIME_CHART("NO_TIME_CHART", "NO_TIME_CHART");
 
+    /** Periyodun gorunen adi (orn. "15 DAKIKALIK TARAMA"). */
     private final String name;
+
+    /** TradingView resolution kodu (orn. "15", "60", "1D"). */
     private final String resolution;
 
     PeriodsEnum(String name, String resolution) {
