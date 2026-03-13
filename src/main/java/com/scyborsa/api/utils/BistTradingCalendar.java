@@ -14,6 +14,7 @@ import java.time.ZoneId;
 @Slf4j
 public final class BistTradingCalendar {
 
+    /** Istanbul saat dilimi (Europe/Istanbul). */
     private static final ZoneId ISTANBUL_ZONE = ZoneId.of("Europe/Istanbul");
 
     /** BIST veri akışı başlangıç saati (açılış seansı + veri gecikmesi). */

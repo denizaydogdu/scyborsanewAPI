@@ -12,14 +12,21 @@ import org.springframework.stereotype.Component;
 @Component
 public class ProfileUtils {
 
+    /** Aktif Spring profil adi (application.yml'den inject edilir). */
     @Value("${spring.profiles.active:dev}")
     private String activeProfile;
 
+    /** Gelistirme profil sabiti. */
     private static final String PROFILE_DEV = "dev";
+    /** Uzun gelistirme profil sabiti. */
     private static final String PROFILE_DEVELOPMENT = "development";
+    /** Yerel gelistirme profil sabiti. */
     private static final String PROFILE_LOCAL = "local";
+    /** Production profil sabiti. */
     private static final String PROFILE_PROD = "prod";
+    /** Uzun production profil sabiti. */
     private static final String PROFILE_PRODUCTION = "production";
+    /** Test profil sabiti. */
     private static final String PROFILE_TEST = "test";
 
     /**

@@ -19,8 +19,11 @@ import java.util.Locale;
  */
 public final class BistCacheUtils {
 
+    /** Istanbul saat dilimi (Europe/Istanbul). */
     private static final ZoneId ISTANBUL_ZONE = ZoneId.of("Europe/Istanbul");
+    /** ISO tarih format deseni (yyyy-MM-dd). */
     private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+    /** Turkce locale (tarih formatlama icin). */
     private static final Locale TR = new Locale("tr", "TR");
 
     private BistCacheUtils() {

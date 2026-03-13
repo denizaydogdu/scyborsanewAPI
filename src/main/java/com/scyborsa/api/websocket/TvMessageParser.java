@@ -21,6 +21,7 @@ import java.util.Map;
 @Slf4j
 public class TvMessageParser {
 
+    /** JSON parse icin paylasimli ObjectMapper instance'i. */
     private static final ObjectMapper objectMapper = new ObjectMapper();
 
     private TvMessageParser() {}

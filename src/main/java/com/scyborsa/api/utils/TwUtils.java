@@ -6,19 +6,31 @@ package com.scyborsa.api.utils;
  */
 public final class TwUtils {
 
+    /** BIST borsa kodu prefix'i (orn. "BIST:THYAO"). */
     public static final String BIST_PREFIX = "BIST:";
 
-    // Sinyal sabitleri
+    // ==================== SİNYAL SABİTLERİ ====================
+
+    /** Guclu alis sinyali metni. */
     public static final String SIGNAL_STRONG_BUY = "Güçlü Al";
+    /** Alis sinyali metni. */
     public static final String SIGNAL_BUY = "Al";
+    /** Notr sinyal metni. */
     public static final String SIGNAL_NEUTRAL = "Nötr";
+    /** Satis sinyali metni. */
     public static final String SIGNAL_SELL = "Sat";
+    /** Guclu satis sinyali metni. */
     public static final String SIGNAL_STRONG_SELL = "Güçlü Sat";
 
-    // Eşik değerleri
+    // ==================== EŞİK DEĞERLERİ ====================
+
+    /** Guclu alis sinyal esigi (Recommend.All &gt;= 0.5). */
     public static final double THRESHOLD_STRONG_BUY = 0.5;
+    /** Alis sinyal esigi (Recommend.All &gt;= 0.1). */
     public static final double THRESHOLD_BUY = 0.1;
+    /** Satis sinyal esigi (Recommend.All &lt;= -0.1). */
     public static final double THRESHOLD_SELL = -0.1;
+    /** Guclu satis sinyal esigi (Recommend.All &lt;= -0.5). */
     public static final double THRESHOLD_STRONG_SELL = -0.5;
 
     private TwUtils() {

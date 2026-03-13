@@ -33,11 +33,17 @@ import java.util.concurrent.ThreadLocalRandom;
 @Slf4j
 public class TradingViewBarWebSocketClient extends WebSocketClient {
 
+    /** TradingView API konfigurasyonu (auth token vb.). */
     private final TradingViewConfig config;
+    /** Bar (mum) verilerinin tutuldugu in-memory cache. */
     private final BarCache barCache;
+    /** Bar ve quote guncellemelerinin istemcilere yayinlandigi servis. */
     private final BarBroadcastService broadcastService;
+    /** WebSocket baglanti durumu (thread-safe). */
     private volatile boolean connected = false;
+    /** TradingView quote session kimligi. */
     private volatile String quoteSessionId;
+    /** Quote aboneligi olusturulmus semboller (duplicate onleme). */
     private final Set<String> quotedSymbols = ConcurrentHashMap.newKeySet();
 
     /**
