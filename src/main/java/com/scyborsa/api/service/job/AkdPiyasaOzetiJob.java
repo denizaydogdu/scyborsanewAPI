@@ -2,7 +2,7 @@ package com.scyborsa.api.service.job;
 
 import com.scyborsa.api.config.TelegramConfig;
 import com.scyborsa.api.dto.enrichment.BrokerageAkdListResponseDto;
-import com.scyborsa.api.service.BrokerageAkdListService;
+import com.scyborsa.api.service.enrichment.BrokerageAkdListService;
 import com.scyborsa.api.service.telegram.AkdPiyasaOzetiTelegramBuilder;
 import com.scyborsa.api.service.telegram.TelegramClient;
 import com.scyborsa.api.utils.BistTradingCalendar;
@@ -16,7 +16,7 @@ import org.springframework.stereotype.Component;
  * AKD Piyasa Özeti Telegram gönderim job'u.
  *
  * <p>Her 30 dakikada bir top 5 alıcı ve top 5 satıcı kurumları
- * Telegram'a gönderir. Seans saatlerinde çalışır (10:03-17:33).</p>
+ * Telegram'a gönderir. Seans saatlerinde çalışır (10:03-18:33).</p>
  *
  * @see AkdPiyasaOzetiTelegramBuilder
  * @see BrokerageAkdListService
@@ -45,7 +45,7 @@ public class AkdPiyasaOzetiJob {
      * AKD piyasa özeti Telegram gönderimini tetikler.
      * Her 30 dakikada bir çalışır (10:03, 10:33, 11:03... 17:33).
      */
-    @Scheduled(cron = "0 3/30 10-17 * * MON-FRI", zone = "Europe/Istanbul")
+    @Scheduled(cron = "0 3/30 10-18 * * MON-FRI", zone = "Europe/Istanbul")
     public void run() {
         if (!profileUtils.isProdProfile()) return;
         if (!telegramConfig.isEnabled()) return;

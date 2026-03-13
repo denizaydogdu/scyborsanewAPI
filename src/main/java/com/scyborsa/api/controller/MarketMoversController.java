@@ -2,8 +2,8 @@ package com.scyborsa.api.controller;
 
 import com.scyborsa.api.dto.market.MarketMoverDto;
 import com.scyborsa.api.dto.market.MarketMoversResponse;
-import com.scyborsa.api.service.MarketMoversCache;
-import com.scyborsa.api.service.ScreenerService;
+import com.scyborsa.api.service.market.MarketMoversCache;
+import com.scyborsa.api.service.market.ScreenerService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
@@ -21,8 +21,8 @@ import java.util.List;
  *
  * <p>Temel endpoint: {@code /api/v1/market}</p>
  *
- * @see com.scyborsa.api.service.MarketMoversCache
- * @see com.scyborsa.api.service.ScreenerService
+ * @see com.scyborsa.api.service.market.MarketMoversCache
+ * @see com.scyborsa.api.service.market.ScreenerService
  */
 @Slf4j
 @RestController

@@ -1,4 +1,4 @@
-package com.scyborsa.api.service;
+package com.scyborsa.api.service.market;
 
 import com.scyborsa.api.dto.market.MarketMoverDto;
 import com.scyborsa.api.dto.market.MarketMoversResponse;

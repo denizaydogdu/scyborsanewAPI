@@ -1,4 +1,6 @@
-package com.scyborsa.api.service;
+package com.scyborsa.api.service.market;
+
+import com.scyborsa.api.service.client.VelzonApiClient;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.scyborsa.api.dto.market.IndexPerformanceDto;

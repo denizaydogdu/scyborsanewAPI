@@ -2,6 +2,7 @@ package com.scyborsa.api.service;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.scyborsa.api.model.StockModel;
+import com.scyborsa.api.service.client.VelzonApiClient;
 import com.scyborsa.api.repository.StockModelRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

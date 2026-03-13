@@ -1,9 +1,9 @@
 package com.scyborsa.api.service.job;
 
 import com.scyborsa.api.dto.market.MarketMoverDto;
-import com.scyborsa.api.service.MarketMoversBroadcastService;
-import com.scyborsa.api.service.MarketMoversCache;
-import com.scyborsa.api.service.ScreenerService;
+import com.scyborsa.api.service.market.MarketMoversBroadcastService;
+import com.scyborsa.api.service.market.MarketMoversCache;
+import com.scyborsa.api.service.market.ScreenerService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;

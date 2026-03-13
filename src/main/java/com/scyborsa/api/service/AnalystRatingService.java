@@ -2,6 +2,7 @@ package com.scyborsa.api.service;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.scyborsa.api.dto.analyst.AnalystRatingDto;
+import com.scyborsa.api.service.client.FintablesApiClient;
 import com.scyborsa.api.dto.analyst.FintablesAnalystRatingResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;

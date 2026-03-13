@@ -12,7 +12,7 @@ import lombok.NoArgsConstructor;
  * yuzde olarak icerir. Velzon API'den alinan performans verisi
  * uzerinden hesaplanir.</p>
  *
- * @see com.scyborsa.api.service.SentimentService
+ * @see com.scyborsa.api.service.market.SentimentService
  * @see com.scyborsa.api.controller.DashboardController
  */
 @Data

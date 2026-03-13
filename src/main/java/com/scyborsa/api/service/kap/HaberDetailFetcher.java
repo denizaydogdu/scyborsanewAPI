@@ -1,4 +1,4 @@
-package com.scyborsa.api.service;
+package com.scyborsa.api.service.kap;
 
 import com.scyborsa.api.model.haber.HaberDetay;
 import com.scyborsa.api.repository.HaberDetayRepository;

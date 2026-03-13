@@ -1,9 +1,11 @@
-package com.scyborsa.api.service;
+package com.scyborsa.api.service.enrichment;
 
 import com.scyborsa.api.dto.enrichment.BrokerageAkdDetailResponseDto;
 import com.scyborsa.api.dto.enrichment.BrokerageAkdDetailResponseDto.StockAkdItemDto;
 import com.scyborsa.api.dto.enrichment.FintablesBrokerageAkdDetailDto;
 import com.scyborsa.api.repository.AraciKurumRepository;
+import com.scyborsa.api.service.market.Bist100Service;
+import com.scyborsa.api.service.client.FintablesApiClient;
 import com.scyborsa.api.utils.BistCacheUtils;
 
 import lombok.RequiredArgsConstructor;

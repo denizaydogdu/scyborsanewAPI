@@ -6,7 +6,7 @@ import com.scyborsa.api.dto.backoffice.ScreenerResultSummaryDto;
 import com.scyborsa.api.dto.backoffice.StockDto;
 import com.scyborsa.api.service.AraciKurumService;
 import com.scyborsa.api.service.BackofficeService;
-import com.scyborsa.api.service.FintablesApiClient;
+import com.scyborsa.api.service.client.FintablesApiClient;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;

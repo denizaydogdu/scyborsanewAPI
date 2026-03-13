@@ -1,7 +1,7 @@
 package com.scyborsa.api.controller;
 
 import com.scyborsa.api.dto.screener.TvScreenerResponseModel;
-import com.scyborsa.api.service.PineScreenerService;
+import com.scyborsa.api.service.market.PineScreenerService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
@@ -17,7 +17,7 @@ import java.util.List;
  *
  * <p>Temel endpoint: {@code /api/v1/tw}</p>
  *
- * @see com.scyborsa.api.service.PineScreenerService
+ * @see com.scyborsa.api.service.market.PineScreenerService
  */
 @Slf4j
 @RestController

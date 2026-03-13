@@ -1,4 +1,4 @@
-package com.scyborsa.api.service;
+package com.scyborsa.api.service.client;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -27,8 +27,8 @@ import java.time.Duration;
  *   <li>{@link com.fasterxml.jackson.databind.ObjectMapper} - JSON deserialization</li>
  * </ul>
  *
- * @see BistStockSyncService
- * @see PineScreenerService
+ * @see com.scyborsa.api.service.BistStockSyncService
+ * @see com.scyborsa.api.service.market.PineScreenerService
  */
 @Slf4j
 @Service

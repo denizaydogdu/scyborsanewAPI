@@ -13,7 +13,7 @@ import lombok.NoArgsConstructor;
  *
  * <p>Veri kaynagi: Velzon API {@code /api/pinescreener/velzon_indexes_performance} endpoint'i.</p>
  *
- * @see com.scyborsa.api.service.IndexPerformanceService
+ * @see com.scyborsa.api.service.market.IndexPerformanceService
  */
 @Data
 @Builder

@@ -1,6 +1,6 @@
 package com.scyborsa.api.controller;
 
-import com.scyborsa.api.service.Bist100Service;
+import com.scyborsa.api.service.market.Bist100Service;
 import com.scyborsa.api.service.StockLogoService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

@@ -1,4 +1,4 @@
-package com.scyborsa.api.service;
+package com.scyborsa.api.service.client;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;

@@ -3,6 +3,7 @@ package com.scyborsa.api.service;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.scyborsa.api.dto.fund.FundDetailDto;
+import com.scyborsa.api.service.client.VelzonApiClient;
 import com.scyborsa.api.dto.fund.FundDto;
 import com.scyborsa.api.dto.fund.FundStatsDto;
 import com.scyborsa.api.dto.fund.FundTimeSeriesDto;

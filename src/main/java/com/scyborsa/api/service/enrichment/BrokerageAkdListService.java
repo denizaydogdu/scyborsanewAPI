@@ -1,7 +1,8 @@
-package com.scyborsa.api.service;
+package com.scyborsa.api.service.enrichment;
 
 import com.scyborsa.api.dto.enrichment.BrokerageAkdListResponseDto;
 import com.scyborsa.api.dto.enrichment.FintablesBrokerageAkdListDto;
+import com.scyborsa.api.service.client.FintablesApiClient;
 import com.scyborsa.api.utils.BistCacheUtils;
 
 import lombok.RequiredArgsConstructor;

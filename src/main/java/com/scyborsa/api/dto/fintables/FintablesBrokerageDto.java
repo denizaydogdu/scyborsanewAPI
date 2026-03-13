@@ -13,7 +13,7 @@ import lombok.NoArgsConstructor;
  * bilgilerini temsil eder. JSON field isimleri {@code @JsonProperty}
  * ile eslenir.</p>
  *
- * @see com.scyborsa.api.service.FintablesApiClient#getBrokerages()
+ * @see com.scyborsa.api.service.client.FintablesApiClient#getBrokerages()
  * @see com.scyborsa.api.service.AraciKurumService#syncFromBrokerageList(java.util.List)
  */
 @Data

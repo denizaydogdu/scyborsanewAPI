@@ -1,4 +1,4 @@
-package com.scyborsa.api.service;
+package com.scyborsa.api.service.market;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;

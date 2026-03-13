@@ -1,4 +1,4 @@
-package com.scyborsa.api.service;
+package com.scyborsa.api.service.kap;
 
 import com.scyborsa.api.dto.kap.KapHaberDto;
 import com.scyborsa.api.repository.KapHaberRepository;

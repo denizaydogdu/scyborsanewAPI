@@ -10,7 +10,7 @@ import com.scyborsa.api.model.AraciKurum;
 import com.scyborsa.api.model.EnrichmentCache;
 import com.scyborsa.api.repository.AraciKurumRepository;
 import com.scyborsa.api.repository.EnrichmentCacheRepository;
-import com.scyborsa.api.service.FintablesApiClient;
+import com.scyborsa.api.service.client.FintablesApiClient;
 import com.scyborsa.api.utils.AkdTakasTimeResolver;
 import com.scyborsa.api.utils.AkdTakasTimeResolver.ReadStrategy;
 import com.scyborsa.api.utils.BistCacheUtils;

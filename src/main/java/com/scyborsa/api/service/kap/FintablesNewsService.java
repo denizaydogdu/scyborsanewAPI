@@ -5,7 +5,7 @@ import com.scyborsa.api.dto.fintables.FintablesTopicFeedItemDto;
 import com.scyborsa.api.dto.fintables.FintablesTopicFeedResponseDto;
 import com.scyborsa.api.dto.kap.KapNewsItemDto;
 import com.scyborsa.api.dto.kap.KapRelatedSymbolDto;
-import com.scyborsa.api.service.FintablesApiClient;
+import com.scyborsa.api.service.client.FintablesApiClient;
 import com.scyborsa.api.utils.BistCacheUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

@@ -2,8 +2,8 @@ package com.scyborsa.api.controller;
 
 import com.scyborsa.api.dto.market.DashboardSentimentDto;
 import com.scyborsa.api.dto.market.IndexPerformanceDto;
-import com.scyborsa.api.service.IndexPerformanceService;
-import com.scyborsa.api.service.SentimentService;
+import com.scyborsa.api.service.market.IndexPerformanceService;
+import com.scyborsa.api.service.market.SentimentService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
