@@ -27,12 +27,17 @@ import java.util.List;
 @RequiredArgsConstructor
 public class KapHaberService {
 
+    /** KAP haber veritabani erisim katmani. */
     private final KapHaberRepository kapHaberRepository;
 
+    /** Cache TTL (dakika cinsinden). */
     @Value("${kap.cache.ttl-minutes:10}")
     private int cacheTtlMinutes;
 
+    /** Cache: son cekilmis KAP haber listesi. */
     private volatile List<KapHaberDto> cachedData = List.of();
+
+    /** Cache: son cekme zamani (epoch millis). */
     private volatile long lastFetchTime = 0;
 
     /**

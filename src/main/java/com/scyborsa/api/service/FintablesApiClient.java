@@ -42,8 +42,13 @@ import java.util.concurrent.TimeUnit;
 @Service
 public class FintablesApiClient {
 
+    /** Fintables API konfigurasyonu (base URL, Bearer token, cookie). */
     private final FintablesApiConfig config;
+
+    /** JSON parse icin Jackson ObjectMapper. */
     private final ObjectMapper objectMapper;
+
+    /** HTTP istekleri icin OkHttp istemcisi (Cloudflare uyumlu). */
     private final OkHttpClient httpClient;
 
     /**

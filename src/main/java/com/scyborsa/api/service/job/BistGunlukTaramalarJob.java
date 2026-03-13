@@ -29,9 +29,13 @@ import java.time.ZoneId;
 @RequiredArgsConstructor
 public class BistGunlukTaramalarJob {
 
+    /** Istanbul zaman dilimi sabiti. */
     private static final ZoneId ISTANBUL_ZONE = ZoneId.of("Europe/Istanbul");
 
+    /** Screener tarama orkestrasyon servisi. */
     private final ScreenerExecutionService screenerExecutionService;
+
+    /** Spring profil kontrol yardimcisi. */
     private final ProfileUtils profileUtils;
 
     /**

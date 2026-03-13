@@ -26,10 +26,19 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class AkdPiyasaOzetiJob {
 
+    /** Telegram mesaj gonderim istemcisi. */
     private final TelegramClient telegramClient;
+
+    /** Telegram yapilandirma ayarlari. */
     private final TelegramConfig telegramConfig;
+
+    /** Spring profil kontrol yardimcisi. */
     private final ProfileUtils profileUtils;
+
+    /** Araci kurum AKD listesi servisi (cache reuse). */
     private final BrokerageAkdListService brokerageAkdListService;
+
+    /** AKD piyasa ozeti Telegram mesaj olusturucu. */
     private final AkdPiyasaOzetiTelegramBuilder builder;
 
     /**

@@ -27,13 +27,25 @@ import java.time.Duration;
 @Service
 public class TelegramClient {
 
+    /** Telegram Bot API temel URL'i. */
     private static final String TELEGRAM_API_BASE = "https://api.telegram.org/bot";
+
+    /** sendMessage icin maksimum metin uzunlugu (karakter). */
     private static final int MAX_TEXT_LENGTH = 4096;
+
+    /** sendPhoto caption icin maksimum uzunluk (karakter). */
     private static final int MAX_CAPTION_LENGTH = 1024;
+
+    /** HTTP baglanti zaman asimi suresi. */
     private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(10);
+
+    /** HTTP istek zaman asimi suresi. */
     private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(15);
 
+    /** Telegram bot yapilandirma bilgileri. */
     private final TelegramConfig config;
+
+    /** Java 11 HTTP istemcisi. */
     private final HttpClient httpClient;
 
     /**

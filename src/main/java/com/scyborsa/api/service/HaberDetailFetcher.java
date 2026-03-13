@@ -25,9 +25,13 @@ import java.time.ZoneId;
 @Slf4j
 public class HaberDetailFetcher {
 
+    /** Haber detay veritabani erisim katmani. */
     private final HaberDetayRepository haberDetayRepository;
+
+    /** Haber detay cekme servisi (scraping + API). */
     private final HaberDetailService haberDetailService;
 
+    /** Istanbul saat dilimi (haber zamanlari icin). */
     private static final ZoneId ISTANBUL = ZoneId.of("Europe/Istanbul");
 
     /**

@@ -25,11 +25,22 @@ import java.util.List;
 @Service
 public class MarketMoversCache {
 
+    /** En cok yukselen hisse listesi. */
     private volatile List<MarketMoverDto> rising = List.of();
+
+    /** En cok dusen hisse listesi. */
     private volatile List<MarketMoverDto> falling = List.of();
+
+    /** En yuksek hacimli hisse listesi. */
     private volatile List<MarketMoverDto> volume = List.of();
+
+    /** Son yukselen guncelleme zamani (epoch millis). */
     private volatile long lastRisingUpdate = 0;
+
+    /** Son dusen guncelleme zamani (epoch millis). */
     private volatile long lastFallingUpdate = 0;
+
+    /** Son hacim guncelleme zamani (epoch millis). */
     private volatile long lastVolumeUpdate = 0;
 
     /**

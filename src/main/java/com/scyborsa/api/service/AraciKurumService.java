@@ -33,6 +33,7 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class AraciKurumService {
 
+    /** Araci kurum veritabani erisim katmani. */
     private final AraciKurumRepository araciKurumRepository;
 
     /**

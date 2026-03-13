@@ -37,12 +37,17 @@ import java.util.Locale;
 @Service
 public class KapNewsClient {
 
+    /** Istanbul saat dilimi (Europe/Istanbul). */
     private static final ZoneId ISTANBUL_ZONE = ZoneId.of("Europe/Istanbul");
+    /** Turkce tarih-saat formatlayici (orn: "03 Mart 2026 14:30"). */
     private static final DateTimeFormatter FORMATTER =
             DateTimeFormatter.ofPattern("dd MMMM yyyy HH:mm", new Locale("tr", "TR"));
 
+    /** KAP news API yapilandirmasi. */
     private final KapNewsConfig config;
+    /** JSON parse icin Jackson ObjectMapper. */
     private final ObjectMapper objectMapper;
+    /** HTTP istekleri icin Java 11 HttpClient. */
     private final HttpClient httpClient;
 
     /**

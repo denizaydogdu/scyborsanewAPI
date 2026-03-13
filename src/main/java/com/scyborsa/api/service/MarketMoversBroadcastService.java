@@ -29,6 +29,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class MarketMoversBroadcastService {
 
+    /** STOMP mesaj gonderim sablonu. */
     private final SimpMessagingTemplate messagingTemplate;
 
     /**

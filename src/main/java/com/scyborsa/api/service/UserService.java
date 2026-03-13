@@ -32,6 +32,7 @@ import java.util.List;
 @Slf4j
 public class UserService {
 
+    /** Kullanici veritabani erisim katmani. */
     private final AppUserRepository appUserRepository;
 
     /** BCrypt sifre encoder'i. Spring Security context'i olmadan dogrudan kullanilir. */

@@ -19,10 +19,14 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class BistStockSyncService {
 
+    /** Velzon API istemcisi. */
     private final VelzonApiClient velzonApiClient;
+
+    /** Hisse veritabani erisim katmani. */
     private final StockModelRepository stockModelRepository;
 
-    private static final long DEFAULT_STOCK_TYPE_ID = 1L; // BIST hisse senedi
+    /** Varsayilan hisse tipi ID'si (BIST hisse senedi). */
+    private static final long DEFAULT_STOCK_TYPE_ID = 1L;
 
     /**
      * Tüm BIST hisselerini api.velzon.tr'den çekip DB'ye kaydeder.

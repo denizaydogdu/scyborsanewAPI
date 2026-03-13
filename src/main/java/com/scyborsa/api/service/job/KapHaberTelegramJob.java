@@ -33,11 +33,22 @@ import java.util.concurrent.ConcurrentHashMap;
 @RequiredArgsConstructor
 public class KapHaberTelegramJob {
 
+    /** Telegram mesaj gonderim istemcisi. */
     private final TelegramClient telegramClient;
+
+    /** Telegram yapilandirma ayarlari. */
     private final TelegramConfig telegramConfig;
+
+    /** Spring profil kontrol yardimcisi. */
     private final ProfileUtils profileUtils;
+
+    /** Fintables haber servisi (KAP haberleri kaynagi). */
     private final FintablesNewsService fintablesNewsService;
+
+    /** KAP haber Telegram mesaj olusturucu. */
     private final KapHaberTelegramBuilder builder;
+
+    /** Haber detay repository (shortDescription arama icin). */
     private final HaberDetayRepository haberDetayRepository;
 
     /** Gonderilmis haber ID'leri (gunluk reset). */

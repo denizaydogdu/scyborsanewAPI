@@ -29,6 +29,7 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class SentimentService {
 
+    /** Velzon API istemcisi. */
     private final VelzonApiClient velzonApiClient;
 
     /**

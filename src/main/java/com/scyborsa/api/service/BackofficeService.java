@@ -36,14 +36,31 @@ import java.util.List;
 @RequiredArgsConstructor
 public class BackofficeService {
 
+    /** Hisse veritabani erisim katmani. */
     private final StockModelRepository stockModelRepository;
+
+    /** Analist veritabani erisim katmani. */
     private final AnalistRepository analistRepository;
+
+    /** Araci kurum veritabani erisim katmani. */
     private final AraciKurumRepository araciKurumRepository;
+
+    /** Model portfoy kurum veritabani erisim katmani. */
     private final ModelPortfoyKurumRepository kurumRepository;
+
+    /** Screener sonuc veritabani erisim katmani. */
     private final ScreenerResultRepository screenerResultRepository;
+
+    /** Sektor tanim registry'si. */
     private final SectorDefinitionRegistry sectorDefinitionRegistry;
+
+    /** Screener scan body registry'si. */
     private final ScreenerScanBodyRegistry screenerScanBodyRegistry;
+
+    /** Telegram konfigurasyonu. */
     private final TelegramConfig telegramConfig;
+
+    /** Spring ortam bilgisi (aktif profiller vb.). */
     private final Environment environment;
 
     /**

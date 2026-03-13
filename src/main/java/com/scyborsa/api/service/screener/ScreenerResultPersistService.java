@@ -32,6 +32,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class ScreenerResultPersistService {
 
+    /** Istanbul saat dilimi (Europe/Istanbul). */
     private static final ZoneId ISTANBUL_ZONE = ZoneId.of("Europe/Istanbul");
 
     /**
@@ -39,9 +40,12 @@ public class ScreenerResultPersistService {
      * TÜM scan body JSON dosyalarındaki columns dizisi bu sırayı korumalıdır.
      */
     private static final int IDX_CLOSE_PRICE = 6;
+    /** d[] array'de degisim yuzdesi sutun indeksi. */
     private static final int IDX_CHANGE_PERCENT = 12;
+    /** Gecerli bir data item icin gereken minimum sutun sayisi. */
     private static final int MIN_COLUMNS_REQUIRED = 13;
 
+    /** Tarama sonuclarini saklayan JPA repository. */
     private final ScreenerResultRepository screenerResultRepository;
 
     /**

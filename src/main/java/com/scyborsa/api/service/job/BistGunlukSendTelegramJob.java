@@ -32,8 +32,13 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class BistGunlukSendTelegramJob {
 
+    /** Telegram mesaj gonderim servisi (dedup + batch). */
     private final TelegramSendService telegramSendService;
+
+    /** Spring profil kontrol yardimcisi. */
     private final ProfileUtils profileUtils;
+
+    /** Telegram yapilandirma ayarlari. */
     private final TelegramConfig telegramConfig;
 
     /**

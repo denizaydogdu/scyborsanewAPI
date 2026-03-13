@@ -43,14 +43,26 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class AkdService {
 
+    /** Istanbul saat dilimi. */
     private static final ZoneId ISTANBUL_ZONE = ZoneId.of("Europe/Istanbul");
+
+    /** Turkce tarih formatlayici (orn: "5 Mart 2025"). */
     private static final DateTimeFormatter TR_DATE_FORMATTER =
             DateTimeFormatter.ofPattern("d MMMM yyyy", new Locale("tr", "TR"));
 
+    /** Fintables API istemcisi. */
     private final FintablesApiClient fintablesApiClient;
+
+    /** Araci kurum repository (zenginlestirme icin). */
     private final AraciKurumRepository araciKurumRepository;
+
+    /** Zenginlestirilmis veri cache repository. */
     private final EnrichmentCacheRepository cacheRepository;
+
+    /** Zaman bazli okuma stratejisi belirleyici. */
     private final AkdTakasTimeResolver timeResolver;
+
+    /** JSON serializasyon/deserializasyon icin ObjectMapper. */
     private final ObjectMapper objectMapper;
 
     /**

@@ -34,8 +34,13 @@ import java.time.Duration;
 @Service
 public class VelzonApiClient {
 
+    /** Velzon API konfigurasyonu (base URL, API key, timeout). */
     private final VelzonApiConfig config;
+
+    /** JSON parse icin Jackson ObjectMapper. */
     private final ObjectMapper objectMapper;
+
+    /** HTTP istekleri icin Java 11 HttpClient. */
     private final HttpClient httpClient;
 
     /**

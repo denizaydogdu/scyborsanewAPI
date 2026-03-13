@@ -28,9 +28,13 @@ import java.time.Duration;
 @Service
 public class TradingViewScreenerClient {
 
+    /** TradingView API URL ve cookie yapilandirmasi. */
     private final TradingViewConfig tradingViewConfig;
+    /** JSON parse icin Jackson ObjectMapper. */
     private final ObjectMapper objectMapper;
+    /** HTTP istekleri icin Java 11 HttpClient. */
     private final HttpClient httpClient;
+    /** TradingView Scanner API endpoint URL'i. */
     private final String screenerUrl;
 
     /**

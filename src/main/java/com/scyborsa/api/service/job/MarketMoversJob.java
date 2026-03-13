@@ -29,10 +29,17 @@ import java.util.List;
 @RequiredArgsConstructor
 public class MarketMoversJob {
 
+    /** TradingView screener veri cekme servisi. */
     private final ScreenerService screenerService;
+
+    /** Piyasa hareketlileri bellek cache'i. */
     private final MarketMoversCache cache;
+
+    /** WebSocket broadcast servisi. */
     private final MarketMoversBroadcastService broadcastService;
-    private int fetchState = 0; // 0=rising, 1=falling, 2=volume
+
+    /** Round-robin durum sayaci (0=rising, 1=falling, 2=volume). */
+    private int fetchState = 0;
 
     /**
      * Piyasa hareketlileri verilerini round-robin sirasiyla ceker.

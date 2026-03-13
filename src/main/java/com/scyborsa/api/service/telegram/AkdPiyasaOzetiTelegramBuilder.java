@@ -22,7 +22,10 @@ import java.util.stream.Collectors;
 @Component
 public class AkdPiyasaOzetiTelegramBuilder {
 
+    /** Gosterilecek maksimum kurum sayisi (alici ve satici icin ayri). */
     private static final int TOP_COUNT = 5;
+
+    /** Saat formatlayici (HH:mm). */
     private static final DateTimeFormatter TIME_FMT = DateTimeFormatter.ofPattern("HH:mm");
 
     /**

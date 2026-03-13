@@ -25,7 +25,10 @@ import java.util.List;
 @Service
 public class AnalystRatingService {
 
+    /** Fintables API istemcisi. */
     private final FintablesApiClient fintablesApiClient;
+
+    /** Araci kurum is mantigi servisi (sync icin). */
     private final AraciKurumService araciKurumService;
 
     /** Cache: analist tavsiyeleri. */

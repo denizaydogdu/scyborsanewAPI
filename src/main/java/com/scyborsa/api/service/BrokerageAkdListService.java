@@ -28,13 +28,22 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class BrokerageAkdListService {
 
+    /** Fintables API istemcisi. */
     private final FintablesApiClient fintablesApiClient;
 
-    private static final long CACHE_TTL_LIVE_MS = 60_000; // 60 saniye (seans ici)
-    private static final long CACHE_TTL_OFFHOURS_MS = 3_600_000; // 1 saat (seans disi)
+    /** Seans ici cache TTL (milisaniye): 60 saniye. */
+    private static final long CACHE_TTL_LIVE_MS = 60_000;
 
+    /** Seans disi cache TTL (milisaniye): 1 saat. */
+    private static final long CACHE_TTL_OFFHOURS_MS = 3_600_000;
+
+    /** Cache: son basarili API response. */
     private volatile BrokerageAkdListResponseDto cachedResponse;
+
+    /** Cache: son sorgulan tarih (YYYY-MM-DD). */
     private volatile String cachedDate;
+
+    /** Cache: son guncelleme zamani (epoch millis). */
     private volatile long cacheTimestamp;
 
     /**

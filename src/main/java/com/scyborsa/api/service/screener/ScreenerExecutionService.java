@@ -43,15 +43,20 @@ import java.util.concurrent.TimeUnit;
 @Service
 public class ScreenerExecutionService {
 
+    /** Tek bir scan body icin maksimum bekleme suresi (saniye). */
     private static final long SCAN_TIMEOUT_SECONDS = 30L;
 
     /** Screener turleri arasi rate limit bekleme suresi (milisaniye). */
     @Value("${screener.rate-limit-sleep-ms:1500}")
     private long rateLimitSleepMs;
 
+    /** Scan body JSON dosyalarini sunan registry. */
     private final ScreenerScanBodyRegistry scanBodyRegistry;
+    /** TradingView Scanner API client. */
     private final TradingViewScreenerClient screenerClient;
+    /** Tarama sonuclarini veritabanina kaydeden servis. */
     private final ScreenerResultPersistService persistService;
+    /** Paralel tarama icin thread pool executor. */
     private final Executor screenerExecutor;
 
     /**

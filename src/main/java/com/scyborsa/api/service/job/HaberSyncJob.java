@@ -40,11 +40,19 @@ import java.util.Set;
 @Slf4j
 public class HaberSyncJob {
 
+    /** KAP/piyasa/dunya haber basliklari API istemcisi. */
     private final KapNewsClient kapNewsClient;
+
+    /** Haber detay fetch islemi icin ayri bean (self-call bypass). */
     private final HaberDetailFetcher haberDetailFetcher;
+
+    /** Haber detay JPA repository. */
     private final HaberDetayRepository haberDetayRepository;
+
+    /** Haber senkronizasyon yapilandirma ayarlari. */
     private final HaberSyncConfig haberSyncConfig;
 
+    /** Istanbul zaman dilimi sabiti. */
     private static final ZoneId ISTANBUL = ZoneId.of("Europe/Istanbul");
 
     /**

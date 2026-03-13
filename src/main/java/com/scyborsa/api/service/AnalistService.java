@@ -29,6 +29,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class AnalistService {
 
+    /** Analist veritabani erisim katmani. */
     private final AnalistRepository analistRepository;
 
     /**

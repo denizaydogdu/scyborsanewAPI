@@ -51,10 +51,19 @@ import java.util.stream.Collectors;
 @Service
 public class SectorService {
 
+    /** TradingView API konfigurasyonu (URL, cookie, header). */
     private final TradingViewConfig tradingViewConfig;
+
+    /** JSON parse icin Jackson ObjectMapper. */
     private final ObjectMapper objectMapper;
+
+    /** JSON tabanli sektor tanim registry'si. */
     private final SectorDefinitionRegistry registry;
+
+    /** HTTP istekleri icin Java 11 HttpClient. */
     private final HttpClient httpClient;
+
+    /** TradingView Scanner API URL'i. */
     private final String screenerUrl;
 
     /** Cache: sektor ozet listesi. Volatile ile thread-safe erisim. */

@@ -18,7 +18,10 @@ import java.util.List;
 @Component
 public class MarketSummaryTelegramBuilder {
 
+    /** Saat formatlayici (HH:mm). */
     private static final DateTimeFormatter TIME_FMT = DateTimeFormatter.ofPattern("HH:mm");
+
+    /** Her kategori icin gosterilecek maksimum hisse sayisi. */
     private static final int TOP_LIMIT = 5;
 
     /**

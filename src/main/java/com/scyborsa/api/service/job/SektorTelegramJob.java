@@ -28,10 +28,19 @@ import java.util.List;
 @RequiredArgsConstructor
 public class SektorTelegramJob {
 
+    /** Telegram mesaj gonderim istemcisi. */
     private final TelegramClient telegramClient;
+
+    /** Telegram yapilandirma ayarlari. */
     private final TelegramConfig telegramConfig;
+
+    /** Spring profil kontrol yardimcisi. */
     private final ProfileUtils profileUtils;
+
+    /** Sektor veri servisi (cache reuse). */
     private final SectorService sectorService;
+
+    /** Sektor ozeti Telegram mesaj olusturucu. */
     private final SektorOzetiTelegramBuilder builder;
 
     /**

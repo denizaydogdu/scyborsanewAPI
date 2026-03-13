@@ -32,13 +32,25 @@ import java.util.regex.Pattern;
 @Service
 public class StockLogoService {
 
+    /** TradingView hisse logo CDN temel URL'i. */
     private static final String STOCK_CDN_BASE = "https://s3-symbol-logo.tradingview.com/";
+
+    /** TradingView hisse logo CDN dosya eki. */
     private static final String STOCK_CDN_SUFFIX = "--big.svg";
+
+    /** Fintables araci kurum logo CDN temel URL'i. */
     private static final String BROKERAGE_CDN_BASE = "https://storage.fintables.com/media/uploads/brokerage-logos/";
 
+    /** Bos byte dizisi — bulunamayan logolar icin sentinel deger. */
     private static final byte[] EMPTY = new byte[0];
+
+    /** Hisse logoid format dogrulama deseni. */
     private static final Pattern VALID_LOGOID = Pattern.compile("^[a-z0-9-]{1,100}$");
+
+    /** Araci kurum logo dosya adi format dogrulama deseni. */
     private static final Pattern VALID_BROKERAGE_FILENAME = Pattern.compile("^[a-z0-9_-]{1,100}\\.(png|jpeg|jpg|svg)$");
+
+    /** Maksimum cache boyutu (her iki logo cache icin). */
     private static final int MAX_CACHE_SIZE = 2000;
 
     /** EMPTY sentinel icin negative cache suresi (1 saat). Gecici CDN hatalarinda kalici cache poisoning onlenir. */
@@ -47,10 +59,14 @@ public class StockLogoService {
     /** CDN yanit body maksimum boyutu (512KB). Beklenmedik buyuk yanitlari reddeder. */
     private static final int MAX_RESPONSE_SIZE = 512_000;
 
+    /** Hisse logo cache: logoid -> SVG byte dizisi. */
     private final ConcurrentHashMap<String, byte[]> stockLogoCache = new ConcurrentHashMap<>();
+
+    /** Araci kurum logo cache: dosya adi -> logo byte dizisi. */
     private final ConcurrentHashMap<String, byte[]> brokerageLogoCache = new ConcurrentHashMap<>();
     /** EMPTY sentinel cache'lenen anahtarlarin timestamp'lerini tutar (negative cache TTL icin). */
     private final ConcurrentHashMap<String, Long> negativeCacheTimestamps = new ConcurrentHashMap<>();
+    /** HTTP istekleri icin Java 11 HttpClient. */
     private final HttpClient httpClient;
 
     /**

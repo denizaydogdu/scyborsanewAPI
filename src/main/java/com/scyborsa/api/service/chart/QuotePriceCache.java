@@ -22,6 +22,7 @@ import java.util.concurrent.ConcurrentHashMap;
 @Component
 public class QuotePriceCache {
 
+    /** Sembol bazinda fiyat kotasyonlarinin tutuldugu thread-safe cache. */
     private final ConcurrentHashMap<String, QuoteEntry> quotes = new ConcurrentHashMap<>();
 
     /**
@@ -96,9 +97,16 @@ public class QuotePriceCache {
         return future;
     }
 
+    /**
+     * Tek bir sembolun fiyat kotasyonu verilerini tutan ic sinif.
+     * Volatile alanlar thread-safe erisim saglar.
+     */
     static class QuoteEntry {
+        /** Son alinan fiyat kotasyonu verisi (lp, ch, chp vb.). */
         volatile Map<String, Object> data;
+        /** Son guncelleme zamani (epoch milisaniye). */
         volatile long lastUpdateTime;
+        /** Henuz gelmemis kotasyon icin bekleyen asenkron future. */
         volatile CompletableFuture<Map<String, Object>> pendingFuture;
 
         QuoteEntry(Map<String, Object> data, long lastUpdateTime) {

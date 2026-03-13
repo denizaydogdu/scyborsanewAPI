@@ -43,12 +43,22 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class TelegramSendService {
 
+    /** Istanbul saat dilimi. */
     private static final ZoneId ISTANBUL_ZONE = ZoneId.of("Europe/Istanbul");
+
+    /** Gruplanmis mesaj icin minimum tarama sonucu esigi. */
     private static final int GROUPED_THRESHOLD = 2;
 
+    /** Screener tarama sonuclari repository'si. */
     private final ScreenerResultRepository resultRepository;
+
+    /** Telegram Bot API HTTP istemcisi. */
     private final TelegramClient telegramClient;
+
+    /** Telegram bot yapilandirma bilgileri. */
     private final TelegramConfig telegramConfig;
+
+    /** Telegram mesaj formatlayicisi. */
     private final TelegramMessageFormatter messageFormatter;
 
     // ==================== 2-SESSION DEDUP SET'LERİ ====================
@@ -67,6 +77,7 @@ public class TelegramSendService {
 
     // ==================== SESSION ENUM ====================
 
+    /** Telegram gonderim session turleri (sabah, ogleden sonra, ara donem). */
     private enum Session { MORNING, AFTERNOON, GAP }
 
     // ==================== PUBLIC API ====================

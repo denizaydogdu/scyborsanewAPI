@@ -36,16 +36,23 @@ import java.util.List;
 @Service
 public class ScreenerService {
 
-    // en çok yükselen BIST hisseleri
+    /** En cok yukselen BIST hisseleri icin TradingView scan body JSON'u. */
     private static final String RISING_BODY = "{\"columns\":[\"name\",\"description\",\"logoid\",\"update_mode\",\"type\",\"typespecs\",\"close\",\"pricescale\",\"minmov\",\"fractional\",\"minmove2\",\"currency\",\"change\"],\"ignore_unknown_fields\":false,\"options\":{\"lang\":\"tr\"},\"range\":[0,10],\"sort\":{\"sortBy\":\"change\",\"sortOrder\":\"desc\"},\"symbols\":{},\"markets\":[\"turkey\"],\"filter2\":{\"operator\":\"and\",\"operands\":[{\"operation\":{\"operator\":\"or\",\"operands\":[{\"operation\":{\"operator\":\"and\",\"operands\":[{\"expression\":{\"left\":\"type\",\"operation\":\"equal\",\"right\":\"stock\"}},{\"expression\":{\"left\":\"typespecs\",\"operation\":\"has\",\"right\":[\"common\"]}}]}},{\"operation\":{\"operator\":\"and\",\"operands\":[{\"expression\":{\"left\":\"type\",\"operation\":\"equal\",\"right\":\"stock\"}},{\"expression\":{\"left\":\"typespecs\",\"operation\":\"has\",\"right\":[\"preferred\"]}}]}},{\"operation\":{\"operator\":\"and\",\"operands\":[{\"expression\":{\"left\":\"type\",\"operation\":\"equal\",\"right\":\"dr\"}}]}},{\"operation\":{\"operator\":\"and\",\"operands\":[{\"expression\":{\"left\":\"type\",\"operation\":\"equal\",\"right\":\"fund\"}},{\"expression\":{\"left\":\"typespecs\",\"operation\":\"has_none_of\",\"right\":[\"etf\"]}}]}}]}}]}}";
-    // en çok düşen BIST hisseleri
+    /** En cok dusen BIST hisseleri icin TradingView scan body JSON'u. */
     private static final String FALLING_BODY = "{\"columns\":[\"name\",\"description\",\"logoid\",\"update_mode\",\"type\",\"typespecs\",\"close\",\"pricescale\",\"minmov\",\"fractional\",\"minmove2\",\"currency\",\"change\",\"volume\"],\"ignore_unknown_fields\":false,\"options\":{\"lang\":\"tr\"},\"range\":[0,10],\"sort\":{\"sortBy\":\"change\",\"sortOrder\":\"asc\"},\"symbols\":{},\"markets\":[\"turkey\"],\"filter2\":{\"operator\":\"and\",\"operands\":[{\"operation\":{\"operator\":\"or\",\"operands\":[{\"operation\":{\"operator\":\"and\",\"operands\":[{\"expression\":{\"left\":\"type\",\"operation\":\"equal\",\"right\":\"stock\"}},{\"expression\":{\"left\":\"typespecs\",\"operation\":\"has\",\"right\":[\"common\"]}}]}},{\"operation\":{\"operator\":\"and\",\"operands\":[{\"expression\":{\"left\":\"type\",\"operation\":\"equal\",\"right\":\"stock\"}},{\"expression\":{\"left\":\"typespecs\",\"operation\":\"has\",\"right\":[\"preferred\"]}}]}},{\"operation\":{\"operator\":\"and\",\"operands\":[{\"expression\":{\"left\":\"type\",\"operation\":\"equal\",\"right\":\"dr\"}}]}},{\"operation\":{\"operator\":\"and\",\"operands\":[{\"expression\":{\"left\":\"type\",\"operation\":\"equal\",\"right\":\"fund\"}},{\"expression\":{\"left\":\"typespecs\",\"operation\":\"has_none_of\",\"right\":[\"etf\"]}}]}}]}}]}}";
-    // en çok hacimli BIST hisseleri (volume desc)
+    /** En yuksek hacimli BIST hisseleri icin TradingView scan body JSON'u. */
     private static final String VOLUME_BODY = "{\"columns\":[\"name\",\"description\",\"logoid\",\"update_mode\",\"type\",\"typespecs\",\"close\",\"pricescale\",\"minmov\",\"fractional\",\"minmove2\",\"currency\",\"change\",\"volume\"],\"ignore_unknown_fields\":false,\"options\":{\"lang\":\"tr\"},\"range\":[0,10],\"sort\":{\"sortBy\":\"volume\",\"sortOrder\":\"desc\"},\"symbols\":{},\"markets\":[\"turkey\"],\"filter2\":{\"operator\":\"and\",\"operands\":[{\"operation\":{\"operator\":\"or\",\"operands\":[{\"operation\":{\"operator\":\"and\",\"operands\":[{\"expression\":{\"left\":\"type\",\"operation\":\"equal\",\"right\":\"stock\"}},{\"expression\":{\"left\":\"typespecs\",\"operation\":\"has\",\"right\":[\"common\"]}}]}},{\"operation\":{\"operator\":\"and\",\"operands\":[{\"expression\":{\"left\":\"type\",\"operation\":\"equal\",\"right\":\"stock\"}},{\"expression\":{\"left\":\"typespecs\",\"operation\":\"has\",\"right\":[\"preferred\"]}}]}},{\"operation\":{\"operator\":\"and\",\"operands\":[{\"expression\":{\"left\":\"type\",\"operation\":\"equal\",\"right\":\"dr\"}}]}},{\"operation\":{\"operator\":\"and\",\"operands\":[{\"expression\":{\"left\":\"type\",\"operation\":\"equal\",\"right\":\"fund\"}},{\"expression\":{\"left\":\"typespecs\",\"operation\":\"has_none_of\",\"right\":[\"etf\"]}}]}}]}}]}}";
 
+    /** TradingView API konfigurasyonu (URL, cookie, header). */
     private final TradingViewConfig tradingViewConfig;
+
+    /** HTTP istekleri icin Java 11 HttpClient. */
     private final HttpClient httpClient;
+
+    /** JSON parse icin Jackson ObjectMapper. */
     private final ObjectMapper objectMapper;
+
+    /** TradingView Scanner API URL'i. */
     private final String screenerUrl;
 
     /**

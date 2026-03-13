@@ -33,8 +33,13 @@ import java.util.List;
 @RequiredArgsConstructor
 public class AraciKurumSyncJob {
 
+    /** Fintables API istemcisi (araci kurum listesi kaynagi). */
     private final FintablesApiClient fintablesApiClient;
+
+    /** Araci kurum is mantigi servisi (DB sync). */
     private final AraciKurumService araciKurumService;
+
+    /** Spring profil kontrol yardimcisi. */
     private final ProfileUtils profileUtils;
 
     /**

@@ -29,8 +29,10 @@ import java.util.List;
 @RequiredArgsConstructor
 public class ModelPortfoyService {
 
+    /** Varsayilan araci kurum logo URL'i. */
     private static final String DEFAULT_LOGO = "/assets/images/brokers/default-broker.png";
 
+    /** Model portfoy kurum veritabani erisim katmani. */
     private final ModelPortfoyKurumRepository kurumRepository;
 
     /**

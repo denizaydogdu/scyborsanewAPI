@@ -33,33 +33,47 @@ import java.util.stream.Collectors;
 @Component
 public class TelegramMessageFormatter {
 
+    /** Istanbul saat dilimi. */
     private static final ZoneId ISTANBUL_ZONE = ZoneId.of("Europe/Istanbul");
+
+    /** Turkce locale (tarih/saat formatlama icin). */
     private static final Locale TURKISH_LOCALE = new Locale("tr", "TR");
+
+    /** Saat formatlayici (HH:mm). */
     private static final DateTimeFormatter TIME_FORMATTER =
             DateTimeFormatter.ofPattern("HH:mm", TURKISH_LOCALE);
+
+    /** Tarih-saat formatlayici (HH:mm:ss - dd MMMM yyyy). */
     private static final DateTimeFormatter DATETIME_FORMATTER =
             DateTimeFormatter.ofPattern("HH:mm:ss - dd MMMM yyyy", TURKISH_LOCALE);
 
     // ==================== OPTIONAL ENRICHMENT SERVICES ====================
 
+    /** Kurumsal guc skoru hesaplama servisi (opsiyonel). */
     @Autowired(required = false)
     private KurumsalGucService kurumsalGucService;
 
+    /** Hisse bazli AKD dagitim servisi (opsiyonel). */
     @Autowired(required = false)
     private PerStockAKDService perStockAKDService;
 
+    /** Fintables hisse ozet verisi servisi (opsiyonel). */
     @Autowired(required = false)
     private FintablesSummaryService fintablesSummaryService;
 
+    /** Fintables fon pozisyon verisi servisi (opsiyonel). */
     @Autowired(required = false)
     private FintablesFonPozisyonService fonPozisyonService;
 
+    /** Fintables analist model portfoly servisi (opsiyonel). */
     @Autowired(required = false)
     private FintablesAnalystService analystService;
 
+    /** Takas saklama verisi servisi (opsiyonel). */
     @Autowired(required = false)
     private TakasApiService takasApiService;
 
+    /** Telegram bot yapilandirma bilgileri. */
     @Autowired
     private TelegramConfig telegramConfig;
 

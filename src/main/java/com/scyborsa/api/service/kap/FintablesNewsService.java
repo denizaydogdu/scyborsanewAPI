@@ -48,24 +48,33 @@ import java.util.stream.Stream;
 @RequiredArgsConstructor
 public class FintablesNewsService {
 
+    /** Istanbul saat dilimi (Europe/Istanbul). */
     private static final ZoneId ISTANBUL_ZONE = ZoneId.of("Europe/Istanbul");
+    /** Turkce tarih-saat formatlayici (orn: "03 Mart 2026 14:30"). */
     private static final DateTimeFormatter TR_FORMATTER =
             DateTimeFormatter.ofPattern("dd MMMM yyyy HH:mm", new Locale("tr", "TR"));
+    /** Turkce sadece tarih formatlayici (orn: "03 Mart 2026"). */
     private static final DateTimeFormatter TR_DATE_FORMATTER =
             DateTimeFormatter.ofPattern("dd MMMM yyyy", new Locale("tr", "TR"));
 
     /** Dedup icin zaman penceresi: 30 dakika (1800 saniye). */
     private static final long DEDUP_BUCKET_SECONDS = 1800;
 
-    private static final long CACHE_TTL_LIVE_MS = 120_000;     // 120s seans ici
-    private static final long CACHE_TTL_OFFHOURS_MS = 600_000; // 600s seans disi
+    /** Seans ici cache TTL (120 saniye). */
+    private static final long CACHE_TTL_LIVE_MS = 120_000;
+    /** Seans disi cache TTL (600 saniye). */
+    private static final long CACHE_TTL_OFFHOURS_MS = 600_000;
 
+    /** Fintables API client (agenda + topic-feed). */
     private final FintablesApiClient fintablesApiClient;
 
-    // Volatile cache
+    /** Volatile cache — Haberler karti item'lari. */
     private volatile List<KapNewsItemDto> cachedMarketItems;
+    /** Volatile cache — KAP Bildirimleri karti item'lari. */
     private volatile List<KapNewsItemDto> cachedKapItems;
+    /** Volatile cache — Dunya Haberleri karti item'lari. */
     private volatile List<KapNewsItemDto> cachedWorldItems;
+    /** Cache son yenilenme zamani (epoch milisaniye). */
     private volatile long cacheTimestamp;
 
     /**

@@ -42,10 +42,14 @@ import java.util.concurrent.CompletableFuture;
 @Service
 public class TradingViewBarService {
 
+    /** TradingView WebSocket konfigurasyonu (URL, cookie, auth token). */
     private final TradingViewConfig config;
+    /** Bar verisi ve subscription bilgilerinin tutuldugu in-memory cache. */
     private final BarCache barCache;
+    /** Bar ve quote guncellemelerinin istemcilere yayinlandigi servis. */
     private final BarBroadcastService broadcastService;
 
+    /** Aktif TradingView WebSocket istemci instance'i (volatile — thread-safe erisim). */
     private volatile TradingViewBarWebSocketClient wsClient;
 
     /** Seans açık→kapalı geçişini tespit etmek için önceki durum. */

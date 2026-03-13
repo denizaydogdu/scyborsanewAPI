@@ -35,7 +35,10 @@ import java.util.Map;
 @Service
 public class FundService {
 
+    /** Velzon API istemcisi. */
     private final VelzonApiClient velzonApiClient;
+
+    /** JSON parse icin Jackson ObjectMapper. */
     private final ObjectMapper objectMapper;
 
     /** Cache: tum fonlar. */

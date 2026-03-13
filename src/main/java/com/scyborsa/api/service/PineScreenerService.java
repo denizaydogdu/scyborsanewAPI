@@ -34,6 +34,7 @@ import java.util.*;
 @Service
 public class PineScreenerService {
 
+    /** Velzon API periyot anahtari -> PeriodsEnum esleme haritasi. */
     private static final Map<String, PeriodsEnum> PERIOD_KEY_MAP = Map.of(
             "15", PeriodsEnum.FIFTEEN_MINUTES,
             "30", PeriodsEnum.THIRTY_MINUTES,
@@ -43,7 +44,10 @@ public class PineScreenerService {
             "1W", PeriodsEnum.WEEK
     );
 
+    /** Velzon API istemcisi. */
     private final VelzonApiClient velzonApiClient;
+
+    /** JSON parse icin Jackson ObjectMapper. */
     private final ObjectMapper objectMapper;
 
     /**

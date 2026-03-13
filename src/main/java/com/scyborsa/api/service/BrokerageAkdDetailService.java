@@ -35,12 +35,22 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class BrokerageAkdDetailService {
 
+    /** Fintables API istemcisi. */
     private final FintablesApiClient fintablesApiClient;
+
+    /** Araci kurum veritabani erisim katmani. */
     private final AraciKurumRepository araciKurumRepository;
+
+    /** BIST endeks servisi (logoid enrichment icin). */
     private final Bist100Service bist100Service;
 
-    private static final long CACHE_TTL_LIVE_MS = 60_000;      // Seans ici: 60 saniye
-    private static final long CACHE_TTL_OFFHOURS_MS = 3_600_000; // Seans disi: 1 saat
+    /** Seans ici cache TTL (milisaniye): 60 saniye. */
+    private static final long CACHE_TTL_LIVE_MS = 60_000;
+
+    /** Seans disi cache TTL (milisaniye): 1 saat. */
+    private static final long CACHE_TTL_OFFHOURS_MS = 3_600_000;
+
+    /** Maksimum cache entry sayisi. */
     private static final int MAX_CACHE_SIZE = 100;
 
     /** Cache: key = brokerageCode + "_" + date, value = CachedEntry. */
@@ -222,7 +232,10 @@ public class BrokerageAkdDetailService {
      * Cache entry'si. Response ve timestamp (milisaniye) tutar.
      */
     private static class CachedEntry {
+        /** Cache'lenmis AKD detay response. */
         final BrokerageAkdDetailResponseDto response;
+
+        /** Cache'lenme zamani (epoch millis). */
         final long timestamp;
 
         CachedEntry(BrokerageAkdDetailResponseDto response, long timestamp) {

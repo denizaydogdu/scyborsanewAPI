@@ -48,6 +48,7 @@ public class IndexPerformanceService {
     /** Cache TTL (milisaniye cinsinden): 60 saniye. */
     private static final long CACHE_TTL_MS = 60_000L;
 
+    /** Velzon API istemcisi. */
     private final VelzonApiClient velzonApiClient;
 
     /** Cache: endeks performans listesi. Volatile ile thread-safe erisim. */

@@ -20,7 +20,10 @@ import java.util.Locale;
 @Component
 public class SektorOzetiTelegramBuilder {
 
+    /** Her kategori icin gosterilecek maksimum sektor sayisi. */
     private static final int TOP_COUNT = 5;
+
+    /** Turkce tarih-saat formatlayici. */
     private static final DateTimeFormatter DATETIME_FMT =
             DateTimeFormatter.ofPattern("HH:mm - dd MMMM yyyy", new Locale("tr"));
 

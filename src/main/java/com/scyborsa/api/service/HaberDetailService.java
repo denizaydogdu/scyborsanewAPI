@@ -41,10 +41,16 @@ import jakarta.annotation.PostConstruct;
 @Slf4j
 public class HaberDetailService {
 
+    /** KAP haber konfigurasyonu (story base URL vb.). */
     private final KapNewsConfig kapNewsConfig;
+
+    /** Haber sync konfigurasyonu (fetch timeout vb.). */
     private final HaberSyncConfig haberSyncConfig;
+
+    /** JSON parse icin Jackson ObjectMapper. */
     private final ObjectMapper objectMapper;
 
+    /** HTTP istekleri icin Java 11 HttpClient. */
     private HttpClient httpClient;
 
     /**

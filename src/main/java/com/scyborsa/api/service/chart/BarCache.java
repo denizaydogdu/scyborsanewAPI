@@ -29,10 +29,14 @@ import java.util.concurrent.atomic.AtomicInteger;
 @Component
 public class BarCache {
 
+    /** Bir subscription icin saklanabilecek maksimum bar (mum) sayisi. */
     private static final int MAX_BARS = 1000;
 
+    /** Symbol:period anahtariyla subscription nesnelerinin tutuldugu ana cache. */
     private final ConcurrentHashMap<String, SymbolSubscription> cache = new ConcurrentHashMap<>();
+    /** TradingView chart session ID → cache key esleme tablosu. */
     private final ConcurrentHashMap<String, String> sessionToKey = new ConcurrentHashMap<>();
+    /** Symbol:period bazinda aktif subscriber sayaclarinin tutuldugu map. */
     private final ConcurrentHashMap<String, AtomicInteger> subscriberCounts = new ConcurrentHashMap<>();
 
     /**

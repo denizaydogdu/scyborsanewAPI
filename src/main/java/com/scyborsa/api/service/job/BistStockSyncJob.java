@@ -19,7 +19,10 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class BistStockSyncJob {
 
+    /** BIST hisse senkronizasyon servisi. */
     private final BistStockSyncService bistStockSyncService;
+
+    /** Spring profil kontrol yardimcisi. */
     private final ProfileUtils profileUtils;
 
     /**

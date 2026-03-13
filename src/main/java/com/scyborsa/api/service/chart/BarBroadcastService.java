@@ -36,7 +36,9 @@ import java.util.Set;
 @RequiredArgsConstructor
 public class BarBroadcastService {
 
+    /** STOMP mesaj gonderimi icin Spring messaging template. */
     private final SimpMessagingTemplate messagingTemplate;
+    /** Anlik fiyat kotasyonlarinin tutuldugu cache. */
     private final QuotePriceCache quotePriceCache;
 
     /**

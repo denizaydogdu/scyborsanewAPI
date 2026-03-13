@@ -44,9 +44,16 @@ public class Bist100Service {
     private static final String XU050_PRONAME = "BIST:XU050";
     private static final String XU030_PRONAME = "BIST:XU030";
 
+    /** TradingView API konfigurasyonu (URL, cookie, header). */
     private final TradingViewConfig tradingViewConfig;
+
+    /** JSON parse icin Jackson ObjectMapper. */
     private final ObjectMapper objectMapper;
+
+    /** HTTP istekleri icin Java 11 HttpClient. */
     private final HttpClient httpClient;
+
+    /** TradingView Scanner API URL'i. */
     private final String screenerUrl;
 
     /** Raw cache: tum hisseler (ticker -> index pronames + stock data). */

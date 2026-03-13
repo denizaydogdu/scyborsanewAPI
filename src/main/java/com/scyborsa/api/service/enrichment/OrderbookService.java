@@ -54,7 +54,10 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class OrderbookService {
 
+    /** Istanbul saat dilimi. */
     private static final ZoneId ISTANBUL_ZONE = ZoneId.of("Europe/Istanbul");
+
+    /** Islem zamani formatlayici (HH:mm:ss). */
     private static final DateTimeFormatter TIME_FORMAT = DateTimeFormatter.ofPattern("HH:mm:ss");
 
     /** Seans içi cache TTL (30 saniye). */
@@ -66,13 +69,22 @@ public class OrderbookService {
     /** Maksimum cache boyutu. */
     private static final int MAX_CACHE_SIZE = 100;
 
+    /** Fintables API istemcisi. */
     private final FintablesApiClient fintablesApiClient;
+
+    /** Araci kurum repository (zenginlestirme icin). */
     private final AraciKurumRepository araciKurumRepository;
+
+    /** Zenginlestirilmis veri cache repository. */
     private final EnrichmentCacheRepository cacheRepository;
+
+    /** Zaman bazli okuma stratejisi belirleyici. */
     private final AkdTakasTimeResolver timeResolver;
+
+    /** JSON serializasyon/deserializasyon icin ObjectMapper. */
     private final ObjectMapper objectMapper;
 
-    /** Per-stock orderbook in-memory cache (seans içi LIVE_API için). */
+    /** Per-stock orderbook in-memory cache (seans ici LIVE_API icin). */
     private final ConcurrentHashMap<String, CacheEntry> cache = new ConcurrentHashMap<>();
 
     /**
@@ -337,7 +349,10 @@ public class OrderbookService {
      * In-memory cache entry.
      */
     private static class CacheEntry {
+        /** Cache'lenmis orderbook verisi. */
         final OrderbookResponseDto data;
+
+        /** Cache'e yazilma zamani (epoch milisaniye). */
         final long timestamp;
 
         CacheEntry(OrderbookResponseDto data, long timestamp) {

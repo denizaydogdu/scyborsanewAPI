@@ -47,15 +47,31 @@ import java.util.Set;
 @RequiredArgsConstructor
 public class AkdTakasSyncJob {
 
+    /** Istanbul saat dilimi. */
     private static final ZoneId ISTANBUL_ZONE = ZoneId.of("Europe/Istanbul");
+
+    /** Her hisse arasinda bekleme suresi (milisaniye). */
     private static final int RATE_LIMIT_MS = 10_000;
+
+    /** Eski cache kayitlarinin temizlenecegi gun esigi. */
     private static final int CLEANUP_DAYS = 30;
 
+    /** AKD is mantigi servisi. */
     private final AkdService akdService;
+
+    /** Takas is mantigi servisi. */
     private final TakasService takasService;
+
+    /** Zenginlestirilmis veri cache repository. */
     private final EnrichmentCacheRepository cacheRepository;
+
+    /** Hisse master data repository. */
     private final StockModelRepository stockModelRepository;
+
+    /** Spring profil kontrol utility. */
     private final ProfileUtils profileUtils;
+
+    /** JSON serializasyon icin ObjectMapper. */
     private final ObjectMapper objectMapper;
 
     /**

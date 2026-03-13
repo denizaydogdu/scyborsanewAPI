@@ -42,14 +42,22 @@ import java.util.Set;
 @RequiredArgsConstructor
 public class OrderbookSyncJob {
 
+    /** Istanbul saat dilimi. */
     private static final ZoneId ISTANBUL_ZONE = ZoneId.of("Europe/Istanbul");
 
-    /** Her hisse arasında bekleme süresi (5 saniye). Orderbook tek endpoint, AKD+Takas'tan daha hafif. */
+    /** Her hisse arasinda bekleme suresi (5 saniye). Orderbook tek endpoint, AKD+Takas'tan daha hafif. */
     private static final int RATE_LIMIT_MS = 5_000;
 
+    /** Hisse master data repository. */
     private final StockModelRepository stockModelRepository;
+
+    /** Orderbook is mantigi servisi. */
     private final OrderbookService orderbookService;
+
+    /** Zenginlestirilmis veri cache repository. */
     private final EnrichmentCacheRepository cacheRepository;
+
+    /** Spring profil kontrol utility. */
     private final ProfileUtils profileUtils;
 
     /**

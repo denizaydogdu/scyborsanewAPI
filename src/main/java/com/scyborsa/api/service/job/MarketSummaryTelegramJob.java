@@ -34,13 +34,25 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class MarketSummaryTelegramJob {
 
+    /** Ardisik scan cagrilari arasindaki bekleme suresi (ms). */
     private static final long SCAN_DELAY_MS = 2500;
 
+    /** Telegram mesaj gonderim istemcisi. */
     private final TelegramClient telegramClient;
+
+    /** Telegram yapilandirma ayarlari. */
     private final TelegramConfig telegramConfig;
+
+    /** Spring profil kontrol yardimcisi. */
     private final ProfileUtils profileUtils;
+
+    /** TradingView screener API istemcisi. */
     private final TradingViewScreenerClient screenerClient;
+
+    /** Screener scan body tanimlarini barindiran registry. */
     private final ScreenerScanBodyRegistry scanBodyRegistry;
+
+    /** Piyasa ozeti Telegram mesaj olusturucu. */
     private final MarketSummaryTelegramBuilder builder;
 
     /**
