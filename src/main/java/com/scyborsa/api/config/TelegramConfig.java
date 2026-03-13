@@ -46,6 +46,9 @@ public class TelegramConfig {
     /** Kurumsal Guc Skoru filtre ayarlari. */
     private Kgs kgs = new Kgs();
 
+    /** KAP haber topic ayarları. */
+    private Kap kap = new Kap();
+
     /** TradingView chart base URL'i (Telegram mesajlarindaki chart linki). */
     private String chartBaseUrl = "https://www.tradingview.com/chart/?symbol=BIST:";
 
@@ -122,5 +125,18 @@ public class TelegramConfig {
 
         /** Minimum KGS skoru (0-100). */
         private int minScore = 70;
+    }
+
+    /**
+     * KAP haber Telegram topic ayarları.
+     */
+    @Getter
+    @Setter
+    public static class Kap {
+        /** KAP haberlerinin gönderileceği topic ID. 0 = genel topic. */
+        private int topicId = 0;
+
+        /** Tek çalışmada gönderilecek maksimum haber sayısı. */
+        private int maxPerCycle = 5;
     }
 }

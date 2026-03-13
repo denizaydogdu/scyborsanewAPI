@@ -1,0 +1,27 @@
+{
+  "columns": ["name", "description", "close", "change", "volume"],
+  "filter": [
+    {"left": "change", "operation": "greater", "right": 0}
+  ],
+  "ignore_unknown_fields": false,
+  "options": {"lang": "tr"},
+  "range": [0, 5],
+  "sort": {"sortBy": "change", "sortOrder": "desc"},
+  "symbols": {},
+  "markets": ["turkey"],
+  "filter2": {
+    "operator": "and",
+    "operands": [
+      {
+        "operation": {
+          "operator": "or",
+          "operands": [
+            {"operation": {"operator": "and", "operands": [{"expression": {"left": "type", "operation": "equal", "right": "stock"}}, {"expression": {"left": "typespecs", "operation": "has", "right": ["common"]}}]}},
+            {"operation": {"operator": "and", "operands": [{"expression": {"left": "type", "operation": "equal", "right": "stock"}}, {"expression": {"left": "typespecs", "operation": "has", "right": ["preferred"]}}]}}
+          ]
+        }
+      },
+      {"expression": {"left": "typespecs", "operation": "has_none_of", "right": ["pre-ipo"]}}
+    ]
+  }
+}
