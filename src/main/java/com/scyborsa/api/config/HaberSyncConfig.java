@@ -21,7 +21,7 @@ import org.springframework.context.annotation.Configuration;
  * </pre>
  *
  * @see com.scyborsa.api.service.job.HaberSyncJob
- * @see com.scyborsa.api.service.HaberDetailService
+ * @see com.scyborsa.api.service.kap.HaberDetailService
  */
 @Configuration
 @ConfigurationProperties(prefix = "haber.sync")

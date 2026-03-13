@@ -17,7 +17,7 @@ import java.util.stream.Collectors;
  * HTML formatında Telegram mesajına dönüştürür.</p>
  *
  * @see com.scyborsa.api.service.job.AkdPiyasaOzetiJob
- * @see com.scyborsa.api.service.BrokerageAkdListService
+ * @see com.scyborsa.api.service.enrichment.BrokerageAkdListService
  */
 @Component
 public class AkdPiyasaOzetiTelegramBuilder {
