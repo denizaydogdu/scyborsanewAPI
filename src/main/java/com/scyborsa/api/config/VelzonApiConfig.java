@@ -22,7 +22,10 @@ import org.springframework.context.annotation.Configuration;
 @ConfigurationProperties(prefix = "velzon.api")
 public class VelzonApiConfig {
 
+    /** Velzon API temel URL'i (api.velzon.tr). */
     private String baseUrl;
+
+    /** X-API-KEY header ile gonderilen kimlik dogrulama anahtari. */
     private String apiKey;
 
     /** HTTP client baglanti zaman asimi (saniye). */

@@ -15,6 +15,7 @@ import org.springframework.context.annotation.Configuration;
  *   <li>{@code fintables.api.akd-token} - AKD endpoint'i icin ayri JWT Bearer token</li>
  *   <li>{@code fintables.api.takas-token} - Takas (saklama dagilimi) endpoint'i icin ayri JWT Bearer token</li>
  *   <li>{@code fintables.api.brokerage-token} - Piyasa geneli araci kurum AKD dagilimi endpoint'i icin ayri JWT Bearer token</li>
+ *   <li>{@code fintables.api.orderbook-token} - Emir defteri (orderbook) endpoint'i için ayrı JWT Bearer token</li>
  *   <li>{@code fintables.api.cookie} - Cloudflare uyumlu cookie (auth-token + tracking)</li>
  *   <li>{@code fintables.api.connect-timeout-seconds} - HTTP client baglanti zaman asimi (varsayilan: 10)</li>
  *   <li>{@code fintables.api.request-timeout-seconds} - HTTP client istek zaman asimi (varsayilan: 15)</li>
@@ -26,7 +27,10 @@ import org.springframework.context.annotation.Configuration;
 @ConfigurationProperties(prefix = "fintables.api")
 public class FintablesApiConfig {
 
+    /** Fintables API temel URL'i. */
     private String baseUrl;
+
+    /** Analist tavsiyeleri ve genel endpoint'ler icin JWT Bearer token. */
     private String bearerToken;
 
     /** AKD (Araci Kurum Dagilimi) endpoint'i icin ayri JWT Bearer token. */
@@ -37,6 +41,9 @@ public class FintablesApiConfig {
 
     /** Piyasa geneli aracı kurum AKD dağılımı endpoint'i için ayrı JWT Bearer token. */
     private String brokerageToken;
+
+    /** Emir defteri (orderbook) endpoint'i için ayrı JWT Bearer token. */
+    private String orderbookToken;
 
     /** Fintables API cookie (auth-token + tracking). */
     private String cookie;

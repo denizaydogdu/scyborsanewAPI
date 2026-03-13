@@ -32,18 +32,23 @@ public class TradingViewConfig {
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
             "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 
+    /** WebSocket kanali icin TradingView auth token. */
     @Value("${tradingview.websocket.auth.token:}")
     private String websocketAuthToken;
 
+    /** WebSocket kanali icin TradingView cookie degeri. */
     @Value("${tradingview.websocket.cookie.value:}")
     private String websocketCookieValue;
 
+    /** Screener kanali icin TradingView auth token. */
     @Value("${tradingview.auth.token:}")
     private String authToken;
 
+    /** Screener kanali icin TradingView cookie degeri. */
     @Value("${tradingview.cookie.value:}")
     private String cookieValue;
 
+    /** TradingView Scanner API URL'i (dogrudan baglanti — ADR-010). */
     @Value("${tradingview.screener.url:https://scanner.tradingview.com/turkey/scan?label-product=screener-stock}")
     private String screenerApiUrl;
 
