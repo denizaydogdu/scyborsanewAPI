@@ -2,11 +2,13 @@ package com.scyborsa.api.controller;
 
 import com.scyborsa.api.dto.HaberDetayDto;
 import com.scyborsa.api.dto.KapHaberDto;
+import com.scyborsa.api.dto.kap.KapNewsItemDto;
 import com.scyborsa.api.dto.kap.KapNewsResponseDto;
 import com.scyborsa.api.model.HaberDetay;
 import com.scyborsa.api.repository.HaberDetayRepository;
 import com.scyborsa.api.service.HaberDetailFetcher;
 import com.scyborsa.api.service.KapHaberService;
+import com.scyborsa.api.service.kap.FintablesNewsService;
 import com.scyborsa.api.service.kap.KapNewsClient;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -30,6 +32,7 @@ import java.util.Locale;
  *
  * @see KapHaberService
  * @see KapNewsClient
+ * @see FintablesNewsService
  */
 @RestController
 @RequestMapping("/api/v1/kap")
@@ -38,6 +41,7 @@ public class KapHaberController {
 
     private final KapHaberService kapHaberService;
     private final KapNewsClient kapNewsClient;
+    private final FintablesNewsService fintablesNewsService;
     private final HaberDetayRepository haberDetayRepository;
     private final HaberDetailFetcher haberDetailFetcher;
 
@@ -57,45 +61,61 @@ public class KapHaberController {
     }
 
     /**
-     * TradingView news-mediator API'sinden canlı KAP haberlerini getirir.
+     * Canli KAP haberlerini getirir (TradingView + Fintables merge).
      *
      * <p>HTTP GET {@code /api/v1/kap/news}</p>
      *
-     * <p>API erişilemezse boş liste içeren response döner (graceful degradation).</p>
+     * <p>TradingView KAP haberleri ile Fintables zenginlestirilmis KAP haberlerini
+     * birlestirir. Duplicate haberler 30dk zaman penceresi + sembol eslesmesiyle
+     * filtrelenir, Fintables tercih edilir (note alani).</p>
      *
-     * @return canlı KAP haberleri; hata durumunda boş items listesi
+     * @return birlestirilmis KAP haberleri; hata durumunda bos items listesi
      */
     @GetMapping("/news")
     public KapNewsResponseDto getKapNews() {
-        return orEmpty(kapNewsClient.fetchKapNews());
+        KapNewsResponseDto tvResponse = orEmpty(kapNewsClient.fetchKapNews());
+        List<KapNewsItemDto> ftItems = fintablesNewsService.getKapNewsItems();
+        tvResponse.setItems(FintablesNewsService.mergeAndDedup(
+                tvResponse.getItems() != null ? tvResponse.getItems() : List.of(), ftItems));
+        return tvResponse;
     }
 
     /**
-     * TradingView headlines API'sinden piyasa haberlerini getirir.
+     * Piyasa haberlerini getirir (TradingView + Fintables merge).
      *
      * <p>HTTP GET {@code /api/v1/kap/market-news}</p>
      *
-     * <p>API erişilemezse boş liste içeren response döner (graceful degradation).</p>
+     * <p>TradingView piyasa haberleri ile Fintables post, newsletter,
+     * bilanco ve temettu ajanda ogelerini zamana gore birlestirir.</p>
      *
-     * @return piyasa haberleri; hata durumunda boş items listesi
+     * @return birlestirilmis piyasa haberleri; hata durumunda bos items listesi
      */
     @GetMapping("/market-news")
     public KapNewsResponseDto getMarketNews() {
-        return orEmpty(kapNewsClient.fetchMarketNews());
+        KapNewsResponseDto tvResponse = orEmpty(kapNewsClient.fetchMarketNews());
+        List<KapNewsItemDto> ftItems = fintablesNewsService.getMarketNewsItems();
+        tvResponse.setItems(FintablesNewsService.mergeByTime(
+                tvResponse.getItems() != null ? tvResponse.getItems() : List.of(), ftItems));
+        return tvResponse;
     }
 
     /**
-     * TradingView news-mediator API'sinden dünya haberlerini getirir.
+     * Dunya haberlerini getirir (TradingView + Fintables merge).
      *
      * <p>HTTP GET {@code /api/v1/kap/world-news}</p>
      *
-     * <p>API erişilemezse boş liste içeren response döner (graceful degradation).</p>
+     * <p>TradingView dunya haberleri ile Fintables makro takvim
+     * (TR/US/EU) ogelerini zamana gore birlestirir.</p>
      *
-     * @return dünya haberleri; hata durumunda boş items listesi
+     * @return birlestirilmis dunya haberleri; hata durumunda bos items listesi
      */
     @GetMapping("/world-news")
     public KapNewsResponseDto getWorldNews() {
-        return orEmpty(kapNewsClient.fetchWorldNews());
+        KapNewsResponseDto tvResponse = orEmpty(kapNewsClient.fetchWorldNews());
+        List<KapNewsItemDto> ftItems = fintablesNewsService.getWorldNewsItems();
+        tvResponse.setItems(FintablesNewsService.mergeByTime(
+                tvResponse.getItems() != null ? tvResponse.getItems() : List.of(), ftItems));
+        return tvResponse;
     }
 
     /**
