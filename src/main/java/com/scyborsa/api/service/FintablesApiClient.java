@@ -7,7 +7,10 @@ import com.scyborsa.api.dto.FintablesBrokerageDto;
 import com.scyborsa.api.dto.enrichment.FintablesAkdResponseDto;
 import com.scyborsa.api.dto.enrichment.FintablesBrokerageAkdDetailDto;
 import com.scyborsa.api.dto.enrichment.FintablesBrokerageAkdListDto;
+import com.scyborsa.api.dto.enrichment.FintablesOrderbookResponseDto;
 import com.scyborsa.api.dto.enrichment.FintablesTakasResponseDto;
+import com.scyborsa.api.dto.fintables.FintablesAgendaItemDto;
+import com.scyborsa.api.dto.fintables.FintablesTopicFeedResponseDto;
 import lombok.extern.slf4j.Slf4j;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
@@ -143,6 +146,44 @@ public class FintablesApiClient {
     }
 
     /**
+     * Fintables haftalik ajanda verilerini getirir.
+     *
+     * <p>{@code /mobile/agenda/} endpoint'ine GET istegi yaparak bilanco, temettu,
+     * makro takvim ve webinar gibi ajanda ogelerini dondurur.</p>
+     *
+     * @param time zaman filtresi ("thisWeek" veya "nextWeek")
+     * @return ajanda item listesi
+     * @throws Exception baglanti, I/O veya JSON parse hatasi durumunda
+     */
+    public List<FintablesAgendaItemDto> getAgenda(String time) throws Exception {
+        if (time == null || time.isBlank()) {
+            throw new IllegalArgumentException("Agenda time parametresi bos olamaz");
+        }
+        log.debug("Fintables agenda aliniyor: time={}", time);
+        return get("/mobile/agenda/?time=" + URLEncoder.encode(time, StandardCharsets.UTF_8),
+                new TypeReference<>() {});
+    }
+
+    /**
+     * Fintables topic feed verilerini getirir.
+     *
+     * <p>{@code /topic-feed/} endpoint'ine GET istegi yaparak post, KAP news
+     * ve newsletter gibi topic feed ogelerini dondurur.</p>
+     *
+     * @param pageSize sayfa basina item sayisi
+     * @return paginated topic feed response
+     * @throws Exception baglanti, I/O veya JSON parse hatasi durumunda
+     */
+    public FintablesTopicFeedResponseDto getTopicFeed(int pageSize) throws Exception {
+        if (pageSize < 1 || pageSize > 100) {
+            throw new IllegalArgumentException("pageSize 1-100 araliginda olmali: " + pageSize);
+        }
+        log.debug("Fintables topic feed aliniyor: pageSize={}", pageSize);
+        return get("/topic-feed/?page_size=" + pageSize + "&for_everyone=1&only_pro=1",
+                new TypeReference<>() {});
+    }
+
+    /**
      * Hisse bazlı AKD (Aracı Kurum Dağılımı) verisini Fintables'ten getirir.
      * AKD endpoint'i ayri bir JWT token gerektirir ({@code fintables.api.akd-token}).
      *
@@ -213,6 +254,25 @@ public class FintablesApiClient {
                 + "&end=" + URLEncoder.encode(end, StandardCharsets.UTF_8);
         String body = getWithToken(url, config.getBrokerageToken());
         return objectMapper.readValue(body, FintablesBrokerageAkdDetailDto.class);
+    }
+
+    /**
+     * Hisse bazlı emir defteri (orderbook) işlem verilerini Fintables'ten getirir.
+     * Orderbook endpoint'i ayrı bir JWT token gerektirir ({@code fintables.api.orderbook-token}).
+     *
+     * @param stockCode hisse kodu (ör: "GARAN")
+     * @return paginated orderbook response
+     * @throws IllegalArgumentException stockCode boş ise
+     * @throws Exception                API çağrısı başarısız olursa
+     */
+    public FintablesOrderbookResponseDto getOrderbook(String stockCode) throws Exception {
+        if (stockCode == null || stockCode.isBlank()) {
+            throw new IllegalArgumentException("stockCode boş olamaz");
+        }
+        String url = "/mobile/orderbook/transactions/?code="
+                + URLEncoder.encode(stockCode, StandardCharsets.UTF_8);
+        String body = getWithToken(url, config.getOrderbookToken());
+        return objectMapper.readValue(body, FintablesOrderbookResponseDto.class);
     }
 
     /**

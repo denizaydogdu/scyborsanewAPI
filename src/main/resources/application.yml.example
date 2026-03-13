@@ -89,6 +89,7 @@ fintables:
     akd-token: ${FINTABLES_AKD_TOKEN:CHANGE_ME}
     takas-token: ${FINTABLES_TAKAS_TOKEN:CHANGE_ME}
     brokerage-token: ${FINTABLES_BROKERAGE_TOKEN:CHANGE_ME}
+    orderbook-token: ${FINTABLES_ORDERBOOK_TOKEN:CHANGE_ME}
     cookie: ${FINTABLES_COOKIE:CHANGE_ME}
     connect-timeout-seconds: 10
     request-timeout-seconds: 15

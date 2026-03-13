@@ -13,8 +13,8 @@ import java.time.LocalDateTime;
 /**
  * Zenginleştirme cache entity'si.
  *
- * <p>AKD ve Takas verilerini günlük olarak saklar. Tek tablo, {@code data_type}
- * ile AKD/TAKAS ayrımı yapılır.</p>
+ * <p>AKD, Takas ve Orderbook verilerini günlük olarak saklar. Tek tablo, {@code data_type}
+ * ile AKD/TAKAS/ORDERBOOK ayrımı yapılır.</p>
  *
  * <p>Unique constraint: {@code (stock_code, cache_date, data_type)} →
  * aynı hisse+gün+tip kombinasyonu tekrar yazılmaz.</p>
@@ -45,12 +45,12 @@ public class EnrichmentCache {
     @Column(name = "cache_date", nullable = false)
     private LocalDate cacheDate;
 
-    /** Veri tipi (AKD veya TAKAS). */
+    /** Veri tipi (AKD, TAKAS veya ORDERBOOK). */
     @Enumerated(EnumType.STRING)
     @Column(name = "data_type", nullable = false, length = 10)
     private EnrichmentDataTypeEnum dataType;
 
-    /** Zenginleştirilmiş JSON verisi (AkdResponseDto veya TakasResponseDto). */
+    /** Zenginleştirilmiş JSON verisi (AkdResponseDto, TakasResponseDto veya OrderbookResponseDto). */
     @Column(name = "json_data", nullable = false, columnDefinition = "TEXT")
     private String jsonData;
 

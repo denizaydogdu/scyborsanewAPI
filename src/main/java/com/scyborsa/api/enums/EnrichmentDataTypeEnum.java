@@ -11,5 +11,8 @@ public enum EnrichmentDataTypeEnum {
     AKD,
 
     /** Takas (Saklama Dağılımı) verisi. */
-    TAKAS
+    TAKAS,
+
+    /** Emir Defteri (Orderbook) verisi. */
+    ORDERBOOK
 }
