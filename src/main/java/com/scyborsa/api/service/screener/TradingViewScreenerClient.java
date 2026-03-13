@@ -2,8 +2,8 @@ package com.scyborsa.api.service.screener;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.scyborsa.api.config.TradingViewConfig;
-import com.scyborsa.api.dto.ScanBodyDefinition;
-import com.scyborsa.api.dto.TvScreenerResponse;
+import com.scyborsa.api.dto.screener.ScanBodyDefinition;
+import com.scyborsa.api.dto.screener.TvScreenerResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 

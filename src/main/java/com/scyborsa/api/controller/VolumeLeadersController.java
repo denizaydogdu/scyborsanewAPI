@@ -1,6 +1,6 @@
 package com.scyborsa.api.controller;
 
-import com.scyborsa.api.dto.MarketMoverDto;
+import com.scyborsa.api.dto.market.MarketMoverDto;
 import com.scyborsa.api.service.MarketMoversCache;
 import com.scyborsa.api.service.ScreenerService;
 import lombok.RequiredArgsConstructor;

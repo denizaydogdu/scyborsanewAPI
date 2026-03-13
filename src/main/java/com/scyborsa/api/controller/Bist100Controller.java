@@ -1,6 +1,6 @@
 package com.scyborsa.api.controller;
 
-import com.scyborsa.api.dto.SectorStockDto;
+import com.scyborsa.api.dto.sector.SectorStockDto;
 import com.scyborsa.api.service.Bist100Service;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;

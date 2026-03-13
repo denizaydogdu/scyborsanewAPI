@@ -3,7 +3,7 @@ package com.scyborsa.api.service;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.scyborsa.api.dto.TvScreenerResponseModel;
+import com.scyborsa.api.dto.screener.TvScreenerResponseModel;
 import com.scyborsa.api.enums.PeriodsEnum;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -27,7 +27,7 @@ import java.util.*;
  *   <li>{@link com.fasterxml.jackson.databind.ObjectMapper} - JSON parse islemi</li>
  * </ul>
  *
- * @see com.scyborsa.api.dto.TvScreenerResponseModel
+ * @see com.scyborsa.api.dto.screener.TvScreenerResponseModel
  * @see com.scyborsa.api.enums.PeriodsEnum
  */
 @Slf4j

@@ -12,7 +12,7 @@ import java.time.LocalDateTime;
  * Tablo adı: {@code kap_sent_news}.
  * </p>
  *
- * @see com.scyborsa.api.dto.KapHaberDto
+ * @see com.scyborsa.api.dto.kap.KapHaberDto
  * @see com.scyborsa.api.repository.KapHaberRepository
  */
 @Data

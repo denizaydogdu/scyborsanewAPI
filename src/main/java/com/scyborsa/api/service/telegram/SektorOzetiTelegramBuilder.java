@@ -1,6 +1,6 @@
 package com.scyborsa.api.service.telegram;
 
-import com.scyborsa.api.dto.SectorSummaryDto;
+import com.scyborsa.api.dto.sector.SectorSummaryDto;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;

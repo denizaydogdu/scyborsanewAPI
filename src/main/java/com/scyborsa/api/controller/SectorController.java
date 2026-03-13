@@ -1,9 +1,9 @@
 package com.scyborsa.api.controller;
 
 import com.scyborsa.api.config.SectorDefinitionRegistry;
-import com.scyborsa.api.dto.SectorDefinitionDto;
-import com.scyborsa.api.dto.SectorStockDto;
-import com.scyborsa.api.dto.SectorSummaryDto;
+import com.scyborsa.api.dto.sector.SectorDefinitionDto;
+import com.scyborsa.api.dto.sector.SectorStockDto;
+import com.scyborsa.api.dto.sector.SectorSummaryDto;
 import com.scyborsa.api.service.SectorService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

@@ -1,4 +1,4 @@
-package com.scyborsa.api.dto;
+package com.scyborsa.api.dto.kap;
 
 import lombok.*;
 

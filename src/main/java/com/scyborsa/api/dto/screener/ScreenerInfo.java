@@ -1,4 +1,4 @@
-package com.scyborsa.api.dto;
+package com.scyborsa.api.dto.screener;
 
 import java.time.LocalTime;
 

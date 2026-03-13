@@ -1,7 +1,7 @@
 package com.scyborsa.api.service;
 
 import com.fasterxml.jackson.core.type.TypeReference;
-import com.scyborsa.api.dto.DashboardSentimentDto;
+import com.scyborsa.api.dto.market.DashboardSentimentDto;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;

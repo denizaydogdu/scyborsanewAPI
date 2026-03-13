@@ -2,8 +2,8 @@ package com.scyborsa.api.service;
 
 import com.scyborsa.api.config.ScreenerScanBodyRegistry;
 import com.scyborsa.api.config.TelegramConfig;
-import com.scyborsa.api.dto.ScanBodyDefinition;
-import com.scyborsa.api.dto.TvScreenerResponse;
+import com.scyborsa.api.dto.screener.ScanBodyDefinition;
+import com.scyborsa.api.dto.screener.TvScreenerResponse;
 import com.scyborsa.api.enums.ScreenerTypeEnum;
 import com.scyborsa.api.service.screener.TradingViewScreenerClient;
 import com.scyborsa.api.service.telegram.MarketSummaryTelegramBuilder;

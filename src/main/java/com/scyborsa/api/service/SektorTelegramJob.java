@@ -1,7 +1,7 @@
 package com.scyborsa.api.service;
 
 import com.scyborsa.api.config.TelegramConfig;
-import com.scyborsa.api.dto.SectorSummaryDto;
+import com.scyborsa.api.dto.sector.SectorSummaryDto;
 import com.scyborsa.api.service.telegram.SektorOzetiTelegramBuilder;
 import com.scyborsa.api.service.telegram.TelegramClient;
 import com.scyborsa.api.utils.BistTradingCalendar;

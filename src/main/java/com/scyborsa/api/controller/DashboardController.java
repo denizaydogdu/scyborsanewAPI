@@ -1,7 +1,7 @@
 package com.scyborsa.api.controller;
 
-import com.scyborsa.api.dto.DashboardSentimentDto;
-import com.scyborsa.api.dto.IndexPerformanceDto;
+import com.scyborsa.api.dto.market.DashboardSentimentDto;
+import com.scyborsa.api.dto.market.IndexPerformanceDto;
 import com.scyborsa.api.service.IndexPerformanceService;
 import com.scyborsa.api.service.SentimentService;
 import lombok.RequiredArgsConstructor;

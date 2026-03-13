@@ -1,4 +1,4 @@
-package com.scyborsa.api.dto;
+package com.scyborsa.api.dto.market;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;

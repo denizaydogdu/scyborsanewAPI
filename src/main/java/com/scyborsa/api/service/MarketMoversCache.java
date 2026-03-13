@@ -1,7 +1,7 @@
 package com.scyborsa.api.service;
 
-import com.scyborsa.api.dto.MarketMoverDto;
-import com.scyborsa.api.dto.MarketMoversResponse;
+import com.scyborsa.api.dto.market.MarketMoverDto;
+import com.scyborsa.api.dto.market.MarketMoversResponse;
 import org.springframework.stereotype.Service;
 
 import java.util.List;

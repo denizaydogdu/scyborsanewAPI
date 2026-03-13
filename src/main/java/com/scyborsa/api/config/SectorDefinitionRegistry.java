@@ -2,7 +2,7 @@ package com.scyborsa.api.config;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.scyborsa.api.dto.SectorDefinitionDto;
+import com.scyborsa.api.dto.sector.SectorDefinitionDto;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

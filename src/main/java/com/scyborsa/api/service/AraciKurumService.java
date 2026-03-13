@@ -1,7 +1,7 @@
 package com.scyborsa.api.service;
 
 import com.scyborsa.api.dto.AraciKurumDto;
-import com.scyborsa.api.dto.FintablesBrokerageDto;
+import com.scyborsa.api.dto.fintables.FintablesBrokerageDto;
 import com.scyborsa.api.dto.analyst.AnalystRatingDto;
 import com.scyborsa.api.model.AraciKurum;
 import com.scyborsa.api.repository.AraciKurumRepository;

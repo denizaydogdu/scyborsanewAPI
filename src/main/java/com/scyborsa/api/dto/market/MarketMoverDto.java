@@ -1,4 +1,4 @@
-package com.scyborsa.api.dto;
+package com.scyborsa.api.dto.market;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -7,8 +7,8 @@ import lombok.NoArgsConstructor;
 /**
  * Piyasa hareket ettirici (market mover) hisse bilgisi DTO'su.
  * <p>
- * En çok yükselen veya en çok düşen hisseleri temsil eder.
- * {@link MarketMoversResponse} içinde liste elemanı olarak kullanılır.
+ * En cok yukselen veya en cok dusen hisseleri temsil eder.
+ * {@link MarketMoversResponse} icinde liste elemani olarak kullanilir.
  * </p>
  *
  * @see MarketMoversResponse

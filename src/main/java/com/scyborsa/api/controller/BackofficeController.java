@@ -1,6 +1,6 @@
 package com.scyborsa.api.controller;
 
-import com.scyborsa.api.dto.FintablesBrokerageDto;
+import com.scyborsa.api.dto.fintables.FintablesBrokerageDto;
 import com.scyborsa.api.dto.backoffice.BackofficeDashboardDto;
 import com.scyborsa.api.dto.backoffice.ScreenerResultSummaryDto;
 import com.scyborsa.api.dto.backoffice.StockDto;

@@ -1,6 +1,6 @@
 package com.scyborsa.api.service;
 
-import com.scyborsa.api.dto.KapHaberDto;
+import com.scyborsa.api.dto.kap.KapHaberDto;
 import com.scyborsa.api.repository.KapHaberRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -20,7 +20,7 @@ import java.util.List;
  *   <li>{@link com.scyborsa.api.repository.KapHaberRepository} - KAP haber veritabani erisimi</li>
  * </ul>
  *
- * @see com.scyborsa.api.dto.KapHaberDto
+ * @see com.scyborsa.api.dto.kap.KapHaberDto
  */
 @Slf4j
 @Service

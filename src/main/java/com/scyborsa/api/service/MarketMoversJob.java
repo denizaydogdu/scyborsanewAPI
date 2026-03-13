@@ -1,6 +1,6 @@
 package com.scyborsa.api.service;
 
-import com.scyborsa.api.dto.MarketMoverDto;
+import com.scyborsa.api.dto.market.MarketMoverDto;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;

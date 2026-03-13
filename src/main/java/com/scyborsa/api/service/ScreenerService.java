@@ -3,7 +3,7 @@ package com.scyborsa.api.service;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.scyborsa.api.config.TradingViewConfig;
-import com.scyborsa.api.dto.MarketMoverDto;
+import com.scyborsa.api.dto.market.MarketMoverDto;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 

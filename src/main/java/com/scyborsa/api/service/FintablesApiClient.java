@@ -3,7 +3,7 @@ package com.scyborsa.api.service;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.scyborsa.api.config.FintablesApiConfig;
-import com.scyborsa.api.dto.FintablesBrokerageDto;
+import com.scyborsa.api.dto.fintables.FintablesBrokerageDto;
 import com.scyborsa.api.dto.enrichment.FintablesAkdResponseDto;
 import com.scyborsa.api.dto.enrichment.FintablesBrokerageAkdDetailDto;
 import com.scyborsa.api.dto.enrichment.FintablesBrokerageAkdListDto;

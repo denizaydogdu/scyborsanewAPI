@@ -1,6 +1,6 @@
 package com.scyborsa.api.service.telegram;
 
-import com.scyborsa.api.dto.TvScreenerResponse;
+import com.scyborsa.api.dto.screener.TvScreenerResponse;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalTime;

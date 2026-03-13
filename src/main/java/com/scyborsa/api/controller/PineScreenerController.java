@@ -1,6 +1,6 @@
 package com.scyborsa.api.controller;
 
-import com.scyborsa.api.dto.TvScreenerResponseModel;
+import com.scyborsa.api.dto.screener.TvScreenerResponseModel;
 import com.scyborsa.api.service.PineScreenerService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

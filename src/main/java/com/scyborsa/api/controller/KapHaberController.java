@@ -1,7 +1,7 @@
 package com.scyborsa.api.controller;
 
-import com.scyborsa.api.dto.HaberDetayDto;
-import com.scyborsa.api.dto.KapHaberDto;
+import com.scyborsa.api.dto.kap.HaberDetayDto;
+import com.scyborsa.api.dto.kap.KapHaberDto;
 import com.scyborsa.api.dto.kap.KapNewsItemDto;
 import com.scyborsa.api.dto.kap.KapNewsResponseDto;
 import com.scyborsa.api.model.HaberDetay;

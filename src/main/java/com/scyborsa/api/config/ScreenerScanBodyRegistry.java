@@ -1,6 +1,6 @@
 package com.scyborsa.api.config;
 
-import com.scyborsa.api.dto.ScanBodyDefinition;
+import com.scyborsa.api.dto.screener.ScanBodyDefinition;
 import com.scyborsa.api.enums.ScreenerTypeEnum;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;

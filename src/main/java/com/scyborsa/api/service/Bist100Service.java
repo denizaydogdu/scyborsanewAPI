@@ -3,7 +3,7 @@ package com.scyborsa.api.service;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.scyborsa.api.config.TradingViewConfig;
-import com.scyborsa.api.dto.SectorStockDto;
+import com.scyborsa.api.dto.sector.SectorStockDto;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
