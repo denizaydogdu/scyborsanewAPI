@@ -120,7 +120,7 @@ public class BackofficeController {
     public ResponseEntity<Map<String, Object>> syncBrokerages() {
         try {
             log.info("[BACKOFFICE] Manuel araci kurum sync tetiklendi");
-            java.util.List<FintablesBrokerageDto> brokerages = fintablesApiClient.getBrokerages();
+            List<FintablesBrokerageDto> brokerages = fintablesApiClient.getBrokerages();
             araciKurumService.syncFromBrokerageList(brokerages);
             log.info("[BACKOFFICE] Manuel araci kurum sync tamamlandi ({} kurum)", brokerages.size());
             return ResponseEntity.ok(Map.of("status", "OK", "count", brokerages.size()));

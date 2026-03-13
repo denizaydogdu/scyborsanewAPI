@@ -15,6 +15,8 @@ import org.springframework.web.bind.annotation.RestController;
 /**
  * AKD (Aracı Kurum Dağılımı) REST controller'ı.
  * Hisse bazlı aracı kurum dağılım verilerini sunar.
+ *
+ * @see AkdService
  */
 @Validated
 @Slf4j

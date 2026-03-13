@@ -15,6 +15,8 @@ import org.springframework.web.bind.annotation.RestController;
 /**
  * Takas (Saklama Dağılımı) REST controller'ı.
  * Hisse bazlı saklama kuruluşu dağılım verilerini sunar.
+ *
+ * @see TakasService
  */
 @Validated
 @Slf4j

@@ -45,6 +45,7 @@ public class KapHaberController {
     private final HaberDetayRepository haberDetayRepository;
     private final HaberDetailFetcher haberDetailFetcher;
 
+    /** Turkce tarih formatlayici (dd MMM yyyy HH:mm, tr_TR locale). */
     private static final DateTimeFormatter TR_FORMATTER =
             DateTimeFormatter.ofPattern("dd MMM yyyy HH:mm", new Locale("tr", "TR"));
 
