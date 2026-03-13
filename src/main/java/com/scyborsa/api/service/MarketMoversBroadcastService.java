@@ -22,7 +22,7 @@ import java.util.List;
  *   <li>{@link org.springframework.messaging.simp.SimpMessagingTemplate} - STOMP mesaj gönderimi</li>
  * </ul>
  *
- * @see MarketMoversJob
+ * @see com.scyborsa.api.service.job.MarketMoversJob
  * @see MarketMoversCache
  */
 @Service

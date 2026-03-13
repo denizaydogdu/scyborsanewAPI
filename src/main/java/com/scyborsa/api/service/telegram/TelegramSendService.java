@@ -36,7 +36,7 @@ import java.util.stream.Collectors;
  *
  * @see TelegramClient
  * @see TelegramMessageFormatter
- * @see com.scyborsa.api.service.BistGunlukSendTelegramJob
+ * @see com.scyborsa.api.service.job.BistGunlukSendTelegramJob
  */
 @Slf4j
 @Service

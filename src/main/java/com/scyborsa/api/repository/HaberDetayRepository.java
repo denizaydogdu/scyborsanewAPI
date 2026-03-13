@@ -19,7 +19,7 @@ import java.util.Set;
  * detail fetch ve cleanup operasyonlari icin ozel query'ler sunar.</p>
  *
  * @see com.scyborsa.api.model.haber.HaberDetay
- * @see com.scyborsa.api.service.HaberSyncJob
+ * @see com.scyborsa.api.service.job.HaberSyncJob
  */
 public interface HaberDetayRepository extends JpaRepository<HaberDetay, Long> {
 

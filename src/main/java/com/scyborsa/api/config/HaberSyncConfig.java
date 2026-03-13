@@ -20,7 +20,7 @@ import org.springframework.context.annotation.Configuration;
  *     fetch-delay: 1000
  * </pre>
  *
- * @see com.scyborsa.api.service.HaberSyncJob
+ * @see com.scyborsa.api.service.job.HaberSyncJob
  * @see com.scyborsa.api.service.HaberDetailService
  */
 @Configuration

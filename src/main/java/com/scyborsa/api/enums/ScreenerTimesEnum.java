@@ -19,7 +19,7 @@ import java.time.ZoneId;
  *   <li><b>Kapanış Seansı:</b> 18:00 - 18:10</li>
  * </ul>
  *
- * @see com.scyborsa.api.service.BistGunlukTaramalarJob
+ * @see com.scyborsa.api.service.job.BistGunlukTaramalarJob
  */
 @Getter
 public enum ScreenerTimesEnum {

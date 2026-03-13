@@ -30,7 +30,7 @@ import java.util.List;
  *   <li>{@link com.fasterxml.jackson.databind.ObjectMapper} - JSON parse islemi</li>
  * </ul>
  *
- * @see MarketMoversJob
+ * @see com.scyborsa.api.service.job.MarketMoversJob
  */
 @Slf4j
 @Service

@@ -11,7 +11,7 @@ import java.time.LocalDateTime;
  * <p>Headline sync ile basliklar kaydedilir, ardindan detail fetch ile icerik scrape edilir.</p>
  *
  * @see com.scyborsa.api.repository.HaberDetayRepository
- * @see com.scyborsa.api.service.HaberSyncJob
+ * @see com.scyborsa.api.service.job.HaberSyncJob
  */
 @Entity
 @Table(name = "haber_detay")

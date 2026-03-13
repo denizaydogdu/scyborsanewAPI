@@ -1,9 +1,10 @@
-package com.scyborsa.api.service;
+package com.scyborsa.api.service.job;
 
 import com.scyborsa.api.config.TelegramConfig;
 import com.scyborsa.api.dto.sector.SectorSummaryDto;
 import com.scyborsa.api.service.telegram.SektorOzetiTelegramBuilder;
 import com.scyborsa.api.service.telegram.TelegramClient;
+import com.scyborsa.api.service.SectorService;
 import com.scyborsa.api.utils.BistTradingCalendar;
 import com.scyborsa.api.utils.ProfileUtils;
 import lombok.RequiredArgsConstructor;

@@ -13,7 +13,7 @@ import java.util.List;
  * <p>En çok yükselen, düşen ve hacimli hisseleri HTML formatında
  * Telegram mesajına dönüştürür.</p>
  *
- * @see com.scyborsa.api.service.MarketSummaryTelegramJob
+ * @see com.scyborsa.api.service.job.MarketSummaryTelegramJob
  */
 @Component
 public class MarketSummaryTelegramBuilder {

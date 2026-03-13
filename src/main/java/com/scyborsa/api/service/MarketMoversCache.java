@@ -19,7 +19,7 @@ import java.util.List;
  * <p>Tüm listeler {@code volatile} olarak tutulur ve immutable kopyalar
  * üzerinden güncellenir (thread-safe).</p>
  *
- * @see MarketMoversJob
+ * @see com.scyborsa.api.service.job.MarketMoversJob
  * @see MarketMoversBroadcastService
  */
 @Service

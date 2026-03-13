@@ -22,7 +22,7 @@ import org.springframework.context.annotation.Configuration;
  * </ul>
  *
  * @see com.scyborsa.api.service.telegram.TelegramClient
- * @see com.scyborsa.api.service.BistGunlukSendTelegramJob
+ * @see com.scyborsa.api.service.job.BistGunlukSendTelegramJob
  */
 @Slf4j
 @Getter

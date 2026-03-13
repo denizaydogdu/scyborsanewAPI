@@ -1,4 +1,4 @@
-package com.scyborsa.api.service;
+package com.scyborsa.api.service.job;
 
 import com.scyborsa.api.enums.ScreenerTimesEnum;
 import com.scyborsa.api.service.screener.ScreenerExecutionService;

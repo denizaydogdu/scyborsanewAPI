@@ -13,11 +13,11 @@ import java.time.ZoneId;
 /**
  * Haber detay cekme islemlerini yuruten yardimci bean.
  *
- * <p>{@link HaberSyncJob} icinde self-call ile {@code @Transactional} proxy bypass sorununu
+ * <p>{@link com.scyborsa.api.service.job.HaberSyncJob} icinde self-call ile {@code @Transactional} proxy bypass sorununu
  * cozmek icin ayri bir bean olarak cikarilmistir. Spring AOP proxy'si ancak
  * farkli bean'ler arasi cagrilarda devreye girer.</p>
  *
- * @see HaberSyncJob
+ * @see com.scyborsa.api.service.job.HaberSyncJob
  * @see HaberDetailService
  */
 @Service

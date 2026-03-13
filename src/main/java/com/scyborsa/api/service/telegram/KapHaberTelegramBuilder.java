@@ -12,7 +12,7 @@ import java.util.stream.Collectors;
  * <p>Her KAP haberi icin ayri bir HTML mesaj olusturur.
  * Ilgili semboller ve kaynak bilgisi eklenir.</p>
  *
- * @see KapHaberTelegramJob
+ * @see com.scyborsa.api.service.job.KapHaberTelegramJob
  * @see com.scyborsa.api.service.kap.FintablesNewsService
  */
 @Component

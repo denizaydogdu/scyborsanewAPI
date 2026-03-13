@@ -1,4 +1,4 @@
-package com.scyborsa.api.service;
+package com.scyborsa.api.service.job;
 
 import com.scyborsa.api.config.TelegramConfig;
 import com.scyborsa.api.service.telegram.TelegramSendService;

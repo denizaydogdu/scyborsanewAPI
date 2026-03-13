@@ -1,7 +1,8 @@
-package com.scyborsa.api.service;
+package com.scyborsa.api.service.job;
 
 import com.scyborsa.api.config.TelegramConfig;
 import com.scyborsa.api.dto.enrichment.BrokerageAkdListResponseDto;
+import com.scyborsa.api.service.BrokerageAkdListService;
 import com.scyborsa.api.service.telegram.AkdPiyasaOzetiTelegramBuilder;
 import com.scyborsa.api.service.telegram.TelegramClient;
 import com.scyborsa.api.utils.BistTradingCalendar;

@@ -1,5 +1,6 @@
-package com.scyborsa.api.service;
+package com.scyborsa.api.service.job;
 
+import com.scyborsa.api.service.BistStockSyncService;
 import com.scyborsa.api.utils.BistTradingCalendar;
 import com.scyborsa.api.utils.ProfileUtils;
 import lombok.RequiredArgsConstructor;

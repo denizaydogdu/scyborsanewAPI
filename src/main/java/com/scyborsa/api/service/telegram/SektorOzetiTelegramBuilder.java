@@ -14,7 +14,7 @@ import java.util.Locale;
  * <p>En çok yükselen ve düşen sektörleri HTML formatında
  * Telegram mesajına dönüştürür.</p>
  *
- * @see SektorTelegramJob
+ * @see com.scyborsa.api.service.job.SektorTelegramJob
  * @see com.scyborsa.api.service.SectorService
  */
 @Component

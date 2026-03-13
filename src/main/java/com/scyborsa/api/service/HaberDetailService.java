@@ -33,7 +33,7 @@ import jakarta.annotation.PostConstruct;
  *   <li>Piyasa/Dunya haberleri: {@link #fetchStoryDetail(String)} — TradingView /v3/story REST API</li>
  * </ul>
  *
- * @see HaberSyncJob
+ * @see com.scyborsa.api.service.job.HaberSyncJob
  * @see KapNewsConfig
  */
 @Service

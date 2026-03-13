@@ -16,7 +16,7 @@ import java.util.stream.Collectors;
  * <p>Top 5 alıcı ve top 5 satıcı kurumların net hacim verilerini
  * HTML formatında Telegram mesajına dönüştürür.</p>
  *
- * @see AkdPiyasaOzetiJob
+ * @see com.scyborsa.api.service.job.AkdPiyasaOzetiJob
  * @see com.scyborsa.api.service.BrokerageAkdListService
  */
 @Component
