@@ -60,10 +60,14 @@ public class AnalystRatingDto {
     @AllArgsConstructor
     @JsonIgnoreProperties(ignoreUnknown = true)
     public static class BrokerageDto {
+        /** Araci kurum kodu (orn. "MLB", "YKR"). */
         private String code;
+        /** Araci kurum tam adi. */
         private String title;
+        /** Araci kurum logo URL'i. */
         private String logo;
 
+        /** Araci kurum kisa adi. */
         @JsonAlias("short_title")
         private String shortTitle;
     }
@@ -76,6 +80,7 @@ public class AnalystRatingDto {
     @AllArgsConstructor
     @JsonIgnoreProperties(ignoreUnknown = true)
     public static class AttachmentDto {
+        /** Ek dosya ID'si. */
         private Integer id;
         /** PDF dosya URL'i. */
         private String file;
