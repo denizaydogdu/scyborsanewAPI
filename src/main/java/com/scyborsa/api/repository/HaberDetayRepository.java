@@ -1,6 +1,6 @@
 package com.scyborsa.api.repository;
 
-import com.scyborsa.api.model.HaberDetay;
+import com.scyborsa.api.model.haber.HaberDetay;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
@@ -18,7 +18,7 @@ import java.util.Set;
  * <p>{@code haber_detay} tablosuna CRUD islemleri saglar. Headline sync,
  * detail fetch ve cleanup operasyonlari icin ozel query'ler sunar.</p>
  *
- * @see com.scyborsa.api.model.HaberDetay
+ * @see com.scyborsa.api.model.haber.HaberDetay
  * @see com.scyborsa.api.service.HaberSyncJob
  */
 public interface HaberDetayRepository extends JpaRepository<HaberDetay, Long> {

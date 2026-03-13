@@ -1,4 +1,4 @@
-package com.scyborsa.api.model;
+package com.scyborsa.api.model.haber;
 
 import jakarta.persistence.*;
 import lombok.*;

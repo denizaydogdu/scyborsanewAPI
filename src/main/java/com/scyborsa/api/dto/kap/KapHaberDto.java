@@ -10,7 +10,7 @@ import lombok.Data;
  * WebSocket {@code /topic/kap-news} kanalı ve REST endpoint'leri üzerinden döner.
  * </p>
  *
- * @see com.scyborsa.api.model.KapHaber
+ * @see com.scyborsa.api.model.haber.KapHaber
  */
 @Data
 @Builder

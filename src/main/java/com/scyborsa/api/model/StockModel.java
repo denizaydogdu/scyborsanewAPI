@@ -72,16 +72,29 @@ public class StockModel {
         updateTime = LocalDateTime.now();
     }
 
+    /**
+     * Hissenin aktif (yasaklanmamis) olup olmadigini dondurur.
+     *
+     * @return {@code true} ise hisse aktif (yasakli degil)
+     */
     public boolean isAktif() {
         return !Boolean.TRUE.equals(isBanned);
     }
 
+    /**
+     * Hisseyi yasaklar ve nedenini kaydeder.
+     *
+     * @param neden yasaklama nedeni aciklamasi
+     */
     public void yasakla(String neden) {
         this.isBanned = true;
         this.bannedSituation = neden;
         this.updateTime = LocalDateTime.now();
     }
 
+    /**
+     * Hissenin yasagini kaldirir ve nedenini temizler.
+     */
     public void yasakKaldir() {
         this.isBanned = false;
         this.bannedSituation = null;

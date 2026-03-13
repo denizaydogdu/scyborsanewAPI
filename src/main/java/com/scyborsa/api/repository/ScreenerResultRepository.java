@@ -1,7 +1,7 @@
 package com.scyborsa.api.repository;
 
 import com.scyborsa.api.enums.ScreenerTypeEnum;
-import com.scyborsa.api.model.ScreenerResultModel;
+import com.scyborsa.api.model.screener.ScreenerResultModel;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;

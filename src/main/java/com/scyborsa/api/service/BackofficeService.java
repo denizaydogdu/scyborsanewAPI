@@ -6,7 +6,7 @@ import com.scyborsa.api.config.TelegramConfig;
 import com.scyborsa.api.dto.backoffice.BackofficeDashboardDto;
 import com.scyborsa.api.dto.backoffice.ScreenerResultSummaryDto;
 import com.scyborsa.api.dto.backoffice.StockDto;
-import com.scyborsa.api.model.ScreenerResultModel;
+import com.scyborsa.api.model.screener.ScreenerResultModel;
 import com.scyborsa.api.model.StockModel;
 import com.scyborsa.api.repository.AnalistRepository;
 import com.scyborsa.api.repository.AraciKurumRepository;

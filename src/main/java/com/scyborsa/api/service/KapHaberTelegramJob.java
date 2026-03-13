@@ -7,7 +7,7 @@ import com.scyborsa.api.service.telegram.KapHaberTelegramBuilder;
 import com.scyborsa.api.service.telegram.TelegramClient;
 import com.scyborsa.api.utils.ProfileUtils;
 import com.scyborsa.api.repository.HaberDetayRepository;
-import com.scyborsa.api.model.HaberDetay;
+import com.scyborsa.api.model.haber.HaberDetay;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;

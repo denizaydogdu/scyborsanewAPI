@@ -1,6 +1,6 @@
 package com.scyborsa.api.repository;
 
-import com.scyborsa.api.model.KapHaber;
+import com.scyborsa.api.model.haber.KapHaber;
 import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.List;
 

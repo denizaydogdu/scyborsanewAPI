@@ -1,4 +1,4 @@
-package com.scyborsa.api.model;
+package com.scyborsa.api.model.screener;
 
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;

@@ -1,6 +1,6 @@
 package com.scyborsa.api.repository;
 
-import com.scyborsa.api.model.ScreenerResultTrackerModel;
+import com.scyborsa.api.model.screener.ScreenerResultTrackerModel;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 

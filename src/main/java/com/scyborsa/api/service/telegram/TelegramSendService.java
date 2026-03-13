@@ -1,7 +1,7 @@
 package com.scyborsa.api.service.telegram;
 
 import com.scyborsa.api.config.TelegramConfig;
-import com.scyborsa.api.model.ScreenerResultModel;
+import com.scyborsa.api.model.screener.ScreenerResultModel;
 import com.scyborsa.api.repository.ScreenerResultRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

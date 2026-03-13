@@ -3,7 +3,7 @@ package com.scyborsa.api.service;
 import com.scyborsa.api.config.HaberSyncConfig;
 import com.scyborsa.api.dto.kap.KapNewsItemDto;
 import com.scyborsa.api.dto.kap.KapNewsResponseDto;
-import com.scyborsa.api.model.HaberDetay;
+import com.scyborsa.api.model.haber.HaberDetay;
 import com.scyborsa.api.repository.HaberDetayRepository;
 import com.scyborsa.api.service.kap.KapNewsClient;
 import lombok.RequiredArgsConstructor;
@@ -32,7 +32,7 @@ import java.util.Set;
  *
  * @see HaberDetailFetcher
  * @see HaberSyncConfig
- * @see com.scyborsa.api.model.HaberDetay
+ * @see com.scyborsa.api.model.haber.HaberDetay
  */
 @Service
 @RequiredArgsConstructor

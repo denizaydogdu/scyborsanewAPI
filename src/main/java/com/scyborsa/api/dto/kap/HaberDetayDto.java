@@ -5,10 +5,10 @@ import lombok.*;
 /**
  * Haber detay veri transfer nesnesi.
  *
- * <p>{@link com.scyborsa.api.model.HaberDetay} entity'sinin API katmaninda
+ * <p>{@link com.scyborsa.api.model.haber.HaberDetay} entity'sinin API katmaninda
  * kullanilan DTO karsiligi. Yayin zamani formatlanmis string olarak tasir.</p>
  *
- * @see com.scyborsa.api.model.HaberDetay
+ * @see com.scyborsa.api.model.haber.HaberDetay
  * @see com.scyborsa.api.controller.KapHaberController
  */
 @Data

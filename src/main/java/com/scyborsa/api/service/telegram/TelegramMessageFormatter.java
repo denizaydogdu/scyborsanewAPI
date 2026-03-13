@@ -2,7 +2,7 @@ package com.scyborsa.api.service.telegram;
 
 import com.scyborsa.api.config.TelegramConfig;
 import com.scyborsa.api.dto.enrichment.*;
-import com.scyborsa.api.model.ScreenerResultModel;
+import com.scyborsa.api.model.screener.ScreenerResultModel;
 import com.scyborsa.api.service.enrichment.*;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;

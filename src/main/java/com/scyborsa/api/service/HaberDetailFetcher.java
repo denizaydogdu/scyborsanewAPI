@@ -1,6 +1,6 @@
 package com.scyborsa.api.service;
 
-import com.scyborsa.api.model.HaberDetay;
+import com.scyborsa.api.model.haber.HaberDetay;
 import com.scyborsa.api.repository.HaberDetayRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

@@ -4,7 +4,7 @@ import com.scyborsa.api.dto.kap.HaberDetayDto;
 import com.scyborsa.api.dto.kap.KapHaberDto;
 import com.scyborsa.api.dto.kap.KapNewsItemDto;
 import com.scyborsa.api.dto.kap.KapNewsResponseDto;
-import com.scyborsa.api.model.HaberDetay;
+import com.scyborsa.api.model.haber.HaberDetay;
 import com.scyborsa.api.repository.HaberDetayRepository;
 import com.scyborsa.api.service.HaberDetailFetcher;
 import com.scyborsa.api.service.KapHaberService;

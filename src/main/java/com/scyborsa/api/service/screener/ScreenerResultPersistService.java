@@ -3,7 +3,7 @@ package com.scyborsa.api.service.screener;
 import com.scyborsa.api.dto.screener.TvScreenerResponse;
 import com.scyborsa.api.enums.ScreenerTimesEnum;
 import com.scyborsa.api.enums.ScreenerTypeEnum;
-import com.scyborsa.api.model.ScreenerResultModel;
+import com.scyborsa.api.model.screener.ScreenerResultModel;
 import com.scyborsa.api.repository.ScreenerResultRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

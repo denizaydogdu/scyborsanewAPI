@@ -1,4 +1,4 @@
-package com.scyborsa.api.model;
+package com.scyborsa.api.model.screener;
 
 import com.scyborsa.api.enums.ScreenerTypeEnum;
 import jakarta.persistence.*;
