@@ -171,6 +171,10 @@ public class HaberDetailService {
             String shortDesc = root.has("shortDescription") && !root.get("shortDescription").isNull()
                     ? Jsoup.clean(root.get("shortDescription").asText(), Safelist.none()) : null;
 
+            // title — on-demand olusturulan haberler icin baslik bilgisi
+            String title = root.has("title") && !root.get("title").isNull()
+                    ? Jsoup.clean(root.get("title").asText(), Safelist.none()) : null;
+
             // astDescription is a JSON AST — convert to readable HTML
             String astContent = null;
             if (root.has("astDescription") && !root.get("astDescription").isNull()) {
@@ -181,7 +185,7 @@ public class HaberDetailService {
             String safeAstContent = astContent != null
                     ? Jsoup.clean(astContent, Safelist.relaxed()) : null;
 
-            return new String[]{shortDesc, safeAstContent};
+            return new String[]{shortDesc, safeAstContent, title};
         } catch (Exception e) {
             log.warn("Story API hatasi [newsId={}]: {}", newsId, e.getMessage());
             return new String[]{null, null};

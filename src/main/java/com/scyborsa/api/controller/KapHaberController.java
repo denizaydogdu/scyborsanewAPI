@@ -14,6 +14,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Locale;
@@ -132,20 +134,31 @@ public class KapHaberController {
     @GetMapping("/haber/{newsId}")
     public ResponseEntity<HaberDetayDto> getHaberDetay(@PathVariable String newsId) {
         // newsId format dogrulama — SSRF ve log injection onlemi
-        if (newsId == null || !newsId.matches("[a-zA-Z0-9_\\-:.]{1,200}")) {
+        if (newsId == null || !newsId.matches("[a-zA-Z0-9_\\-:.,]{1,200}")) {
             return ResponseEntity.badRequest().build();
         }
 
-        return haberDetayRepository.findByNewsId(newsId)
-                .map(haber -> {
-                    // On-demand fetch if not yet fetched
-                    if (!haber.isFetched()) {
-                        haberDetailFetcher.fetchDetailOnDemand(haber);
-                        haber = haberDetayRepository.findByNewsId(newsId).orElse(haber);
-                    }
-                    return ResponseEntity.ok(toDto(haber));
-                })
-                .orElse(ResponseEntity.notFound().build());
+        HaberDetay haber = haberDetayRepository.findByNewsId(newsId).orElse(null);
+
+        // On-demand create: haber henuz sync edilmemisse DB'ye kaydet ve detay cek
+        if (haber == null) {
+            haber = HaberDetay.builder()
+                    .newsId(newsId)
+                    .title("Haber Detayı")
+                    .fetched(false)
+                    .newsType("MARKET")
+                    .createTime(LocalDateTime.now(ZoneId.of("Europe/Istanbul")))
+                    .build();
+            haberDetayRepository.save(haber);
+        }
+
+        // On-demand fetch if not yet fetched
+        if (!haber.isFetched()) {
+            haberDetailFetcher.fetchDetailOnDemand(haber);
+            haber = haberDetayRepository.findByNewsId(newsId).orElse(haber);
+        }
+
+        return ResponseEntity.ok(toDto(haber));
     }
 
     /**

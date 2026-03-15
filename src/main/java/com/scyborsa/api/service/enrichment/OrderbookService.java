@@ -107,7 +107,15 @@ public class OrderbookService {
             switch (strategy) {
                 case DB_PREVIOUS_DAY:
                     LocalDate prevDay = BistTradingCalendar.getPreviousTradingDay(today);
-                    return readFromDbCache(stockCode, prevDay).orElse(emptyResponse());
+                    return readFromDbCache(stockCode, prevDay)
+                            .orElseGet(() -> {
+                                log.info("[Orderbook] DB_PREVIOUS_DAY cache bos, API fallback: stockCode={}, prevDay={}", stockCode, prevDay);
+                                OrderbookResponseDto data = fetchFromApi(stockCode);
+                                if (data != null && data.getTransactions() != null && !data.getTransactions().isEmpty()) {
+                                    saveToDbCache(stockCode, prevDay, data);
+                                }
+                                return data != null ? data : emptyResponse();
+                            });
 
                 case LIVE_API:
                     return fetchWithMemoryCache(stockCode);

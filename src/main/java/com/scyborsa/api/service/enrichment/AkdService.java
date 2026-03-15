@@ -86,7 +86,14 @@ public class AkdService {
                 case DB_PREVIOUS_DAY:
                     LocalDate prevDay = BistTradingCalendar.getPreviousTradingDay(today);
                     return readFromCache(stockCode, prevDay)
-                            .orElse(emptyResponse(prevDay));
+                            .orElseGet(() -> {
+                                log.info("[AKD] DB_PREVIOUS_DAY cache bos, API fallback: stockCode={}, prevDay={}", stockCode, prevDay);
+                                AkdResponseDto data = fetchAndEnrichFromApi(stockCode);
+                                if (data != null && data.getAlicilar() != null && !data.getAlicilar().isEmpty()) {
+                                    saveToCache(stockCode, prevDay, data);
+                                }
+                                return data != null ? data : emptyResponse(prevDay);
+                            });
 
                 case LIVE_API: {
                     AkdResponseDto data = fetchAndEnrichFromApi(stockCode);

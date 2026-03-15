@@ -93,7 +93,14 @@ public class TakasService {
                 case DB_PREVIOUS_DAY:
                     LocalDate prevDay = BistTradingCalendar.getPreviousTradingDay(today);
                     return readFromCache(stockCode, prevDay)
-                            .orElse(emptyResponse(prevDay));
+                            .orElseGet(() -> {
+                                log.info("[Takas] DB_PREVIOUS_DAY cache bos, API fallback: stockCode={}, prevDay={}", stockCode, prevDay);
+                                TakasResponseDto data = fetchAndEnrichFromApi(stockCode);
+                                if (data != null && data.getCustodians() != null && !data.getCustodians().isEmpty()) {
+                                    saveToCache(stockCode, prevDay, data);
+                                }
+                                return data != null ? data : emptyResponse(prevDay);
+                            });
 
                 case LIVE_API: {
                     TakasResponseDto data = fetchAndEnrichFromApi(stockCode);

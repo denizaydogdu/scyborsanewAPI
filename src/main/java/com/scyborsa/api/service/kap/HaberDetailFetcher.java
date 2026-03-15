@@ -58,6 +58,10 @@ public class HaberDetailFetcher {
             if (result != null && result.length >= 2) {
                 haber.setShortDescription(result[0]);
                 haber.setDetailContent(result[1]);
+                // On-demand olusturulan haberler icin title guncelle
+                if (result.length >= 3 && result[2] != null && "Haber Detayı".equals(haber.getTitle())) {
+                    haber.setTitle(result[2]);
+                }
             } else {
                 log.warn("fetchStoryDetail beklenmeyen sonuc [newsId={}]", haber.getNewsId());
             }
