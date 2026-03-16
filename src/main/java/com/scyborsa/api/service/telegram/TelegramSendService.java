@@ -3,8 +3,11 @@ package com.scyborsa.api.service.telegram;
 import com.scyborsa.api.config.TelegramConfig;
 import com.scyborsa.api.model.screener.ScreenerResultModel;
 import com.scyborsa.api.repository.ScreenerResultRepository;
+import com.scyborsa.api.service.ai.VelzonAiService;
+import com.scyborsa.api.service.chart.ChartScreenshotService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
@@ -12,6 +15,7 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -60,6 +64,14 @@ public class TelegramSendService {
 
     /** Telegram mesaj formatlayicisi. */
     private final TelegramMessageFormatter messageFormatter;
+
+    /** Velzon AI analiz servisi (opsiyonel — yoksa AI yorum atlanir). */
+    @Autowired(required = false)
+    private VelzonAiService velzonAiService;
+
+    /** Chart screenshot servisi (opsiyonel — yoksa text fallback yapilir, ADR-017). */
+    @Autowired(required = false)
+    private ChartScreenshotService chartScreenshotService;
 
     // ==================== 2-SESSION DEDUP SET'LERİ ====================
 
@@ -174,8 +186,21 @@ public class TelegramSendService {
                     continue;
                 }
 
-                // Telegram'a gonder — basarisizsa DB'ye YAZMA
-                boolean sent = telegramClient.sendHtmlMessage(message);
+                // Screenshot denemesi — basarisizsa text fallback
+                byte[] screenshot = captureScreenshotIfEnabled(stockName);
+                boolean sent;
+                if (screenshot != null && screenshot.length > 0) {
+                    String caption = buildPhotoCaption(stockName, results);
+                    sent = telegramClient.sendPhoto(screenshot, caption);
+                    if (sent) {
+                        log.info("[TELEGRAM-SEND] {} screenshot ile gonderildi", stockName);
+                    } else {
+                        log.warn("[TELEGRAM-SEND] {} screenshot gonderilemedi, text fallback", stockName);
+                        sent = telegramClient.sendHtmlMessage(message);
+                    }
+                } else {
+                    sent = telegramClient.sendHtmlMessage(message);
+                }
                 if (!sent) {
                     log.warn("[TELEGRAM-SEND] {} icin Telegram gonderilemedi, DB atlanıyor", stockName);
                     continue;
@@ -234,6 +259,33 @@ public class TelegramSendService {
 
         log.info("[TELEGRAM-SEND] Gonderim tamamlandi | Toplam: {} | Gruplanmis: {} | Tekil: {}",
                 totalSent, groupedCount, singleCount);
+
+        // 5. AI yorumlarini ana gonderim tamamlandiktan SONRA isle
+        // Ana Telegram mesajlarini bloklamaz (60s timeout riski yok)
+        sendAiCommentsForBatch(grouped);
+    }
+
+    /**
+     * Tum basarili gonderimler icin AI yorumlarini toplu isle.
+     *
+     * <p>Ana Telegram gonderim dongusunden SONRA calisir,
+     * boylece senkron AI cagrilari (60s timeout) ana mesajlari bloklamaz.</p>
+     *
+     * @param grouped hisse bazli gruplanmis tarama sonuclari
+     */
+    private void sendAiCommentsForBatch(Map<String, List<ScreenerResultModel>> grouped) {
+        if (velzonAiService == null || !velzonAiService.isEnabled()) return;
+        if (!telegramConfig.getAi().isEnabled()) return;
+
+        int sizeBefore = sentAiCommentsToday.size();
+        for (Map.Entry<String, List<ScreenerResultModel>> entry : grouped.entrySet()) {
+            sendAiCommentForStock(entry.getKey(), entry.getValue());
+        }
+        int aiSent = sentAiCommentsToday.size() - sizeBefore;
+
+        if (aiSent > 0) {
+            log.info("[TELEGRAM-SEND] AI yorum gonderimi tamamlandi | Toplam: {}", aiSent);
+        }
     }
 
     /**
@@ -255,7 +307,184 @@ public class TelegramSendService {
                 morningCount, afternoonCount, aiCount);
     }
 
+    /**
+     * Belirtilen hisse icin AI yorumunun bugun gonderilip gonderilmedigini kontrol eder.
+     *
+     * @param stockName hisse kodu
+     * @return bugun zaten gonderildiyse true
+     */
+    public boolean isAiCommentSentToday(String stockName) {
+        return sentAiCommentsToday.contains(stockName);
+    }
+
+    /**
+     * AI yorumunu Telegram'a gonderir.
+     *
+     * <p>Dedup: gunde 1 kez/hisse (sentAiCommentsToday).
+     * AI topic tanimliysa oraya, yoksa fallbackToMain aktifse ana chat'e gonderir.</p>
+     *
+     * @param stockName hisse kodu
+     * @param aiComment AI tarafindan uretilen yorum metni
+     */
+    public void sendAiComment(String stockName, String aiComment) {
+        // Atomic add — TOCTOU race condition onlenir (contains+add yerine tek islem)
+        if (!sentAiCommentsToday.add(stockName)) {
+            log.debug("[TELEGRAM-SEND] AI yorum zaten gonderildi: {}", stockName);
+            return;
+        }
+
+        String html = formatAiComment(stockName, aiComment);
+
+        int topicId = telegramConfig.getAi().getTopicId();
+        boolean sent;
+        if (topicId > 0) {
+            sent = telegramClient.sendHtmlMessageToTopic(html, topicId);
+        } else if (telegramConfig.getAi().isFallbackToMain()) {
+            sent = telegramClient.sendHtmlMessage(html);
+        } else {
+            log.debug("[TELEGRAM-SEND] AI topic tanimli degil ve fallback kapali: {}", stockName);
+            sentAiCommentsToday.remove(stockName); // Rollback — gonderilmedi
+            return;
+        }
+
+        if (sent) {
+            log.info("[TELEGRAM-SEND] AI yorum gonderildi: {}", stockName);
+        } else {
+            sentAiCommentsToday.remove(stockName); // Rollback — tekrar denenebilir
+            log.warn("[TELEGRAM-SEND] AI yorum gonderilemedi: {}", stockName);
+        }
+    }
+
     // ==================== PRIVATE ====================
+
+    /**
+     * AI yorum mesajini HTML formatlar.
+     *
+     * @param stockName hisse kodu
+     * @param aiComment AI yorum metni
+     * @return HTML formatli mesaj
+     */
+    private String formatAiComment(String stockName, String aiComment) {
+        final int TELEGRAM_MAX_LENGTH = 4096;
+        // Template sabit kisim overhead'i (~130 karakter: HTML taglari + disclaimer + zaman)
+        final int TEMPLATE_OVERHEAD = 150;
+
+        DateTimeFormatter dtf = DateTimeFormatter.ofPattern("HH:mm | dd MMMM yyyy",
+                new Locale("tr"));
+        String timeStr = ZonedDateTime.now(ISTANBUL_ZONE).format(dtf);
+
+        // AI yaniti external veri — HTML escape zorunlu (F/K>15 gibi iceriklerde parse hatasi onlenir)
+        String escapedComment = aiComment
+                .replace("&", "&amp;")
+                .replace("<", "&lt;")
+                .replace(">", "&gt;");
+
+        // Yorum truncation'i template'den ONCE yapilir — HTML tag'larin ortasindan kesilmesi onlenir
+        int maxCommentLength = TELEGRAM_MAX_LENGTH - TEMPLATE_OVERHEAD - stockName.length() - timeStr.length();
+        if (escapedComment.length() > maxCommentLength) {
+            escapedComment = escapedComment.substring(0, maxCommentLength - 3) + "...";
+        }
+
+        return String.format(
+                "<b>AI Degerlendirme: %s</b>\n\n%s\n\n<i>%s</i>\n<i>Bu yorum yapay zeka tarafindan uretilmistir, yatirim tavsiyesi degildir.</i>",
+                stockName, escapedComment, timeStr);
+    }
+
+    /**
+     * Hisse icin AI yorumu olusturup AI topic'e gonderir.
+     *
+     * <p>Graceful degradation: tum hatalar yakalanir.
+     * AI cagrılari arası 1 saniye beklenir.</p>
+     *
+     * @param stockName hisse kodu
+     * @param results hisseye ait tarama sonuclari
+     */
+    private void sendAiCommentForStock(String stockName, List<ScreenerResultModel> results) {
+        if (velzonAiService == null || !velzonAiService.isEnabled()) return;
+        if (!telegramConfig.getAi().isEnabled()) return;
+        if (sentAiCommentsToday.contains(stockName)) return;
+
+        try {
+            // En son tarama sonucu en guncel fiyati tasir
+            ScreenerResultModel latest = results.get(results.size() - 1);
+            Double price = latest.getPrice();
+            Double change = latest.getPercentage();
+            List<String> screenerNames = results.stream()
+                    .map(ScreenerResultModel::getScreenerName)
+                    .distinct()
+                    .toList();
+
+            String comment = velzonAiService.analyzeStock(stockName, price, change, screenerNames);
+            if (comment != null && !comment.isBlank()) {
+                sendAiComment(stockName, comment);
+            }
+
+            // Rate limit: AI cagrilari arasi 1 saniye bekle
+            Thread.sleep(1000);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        } catch (Exception e) {
+            log.warn("[TELEGRAM-SEND] AI yorum hatasi ({}): {}", stockName, e.getMessage());
+        }
+    }
+
+    /**
+     * Screenshot servisinden gorsel almayi dener.
+     *
+     * <p>Graceful degradation: servis yoksa, devre disiysa veya hata olursa {@code null} doner.</p>
+     *
+     * @param stockName hisse kodu
+     * @return PNG binary veri veya {@code null}
+     */
+    private byte[] captureScreenshotIfEnabled(String stockName) {
+        if (chartScreenshotService == null || !chartScreenshotService.isEnabled()) return null;
+        try {
+            return chartScreenshotService.captureChartScreenshot(stockName);
+        } catch (Exception e) {
+            log.warn("[TELEGRAM-SEND] Screenshot hatasi ({}): {}", stockName, e.getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Telegram sendPhoto icin kisa caption olusturur.
+     *
+     * <p>Telegram photo caption limiti 1024 karakter.
+     * Hisse adi, fiyat, degisim yuzdesi ve tarama isimlerini icerir.</p>
+     *
+     * @param stockName hisse kodu
+     * @param results hisseye ait tarama sonuclari
+     * @return HTML formatli caption metni
+     */
+    private String buildPhotoCaption(String stockName, List<ScreenerResultModel> results) {
+        ScreenerResultModel latest = results.get(results.size() - 1);
+        String screenerNames = results.stream()
+                .map(ScreenerResultModel::getScreenerName)
+                .filter(Objects::nonNull)
+                .distinct()
+                .collect(Collectors.joining(", "));
+
+        StringBuilder sb = new StringBuilder();
+        sb.append("<b>").append(stockName).append("</b>");
+        if (latest.getPrice() != null) {
+            sb.append(" | ").append(String.format("%.2f TL", latest.getPrice()));
+        }
+        if (latest.getPercentage() != null) {
+            String sign = latest.getPercentage() >= 0 ? "+" : "";
+            sb.append(" (").append(sign).append(String.format("%.2f%%", latest.getPercentage())).append(")");
+        }
+        if (!screenerNames.isEmpty()) {
+            // Screener isimlerini 800 karakterle sinirla — HTML tag kesilmesini onle
+            String safeNames = screenerNames.length() > 800 ? screenerNames.substring(0, 797) + "..." : screenerNames;
+            sb.append("\n").append(safeNames);
+        }
+        // Telegram caption limiti: 1024 karakter
+        if (sb.length() > 1024) {
+            sb.setLength(1021);
+            sb.append("...");
+        }
+        return sb.toString();
+    }
 
     /**
      * Mevcut saate gore session belirler.

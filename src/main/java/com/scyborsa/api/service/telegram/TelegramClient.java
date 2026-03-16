@@ -106,9 +106,10 @@ public class TelegramClient {
      *
      * @param imageBytes PNG binary veri (Content-Type: image/png)
      * @param caption HTML formatinda aciklama
+     * @return {@code true} ise basarili gonderim
      */
-    public void sendPhoto(byte[] imageBytes, String caption) {
-        sendPhoto(imageBytes, caption, config.getBot().getChatId(), config.getBot().getTopicId());
+    public boolean sendPhoto(byte[] imageBytes, String caption) {
+        return sendPhoto(imageBytes, caption, config.getBot().getChatId(), config.getBot().getTopicId());
     }
 
     /**
@@ -120,14 +121,15 @@ public class TelegramClient {
      * @param caption HTML formatinda aciklama (max 1024 byte)
      * @param chatId hedef chat ID
      * @param topicId mesaj thread ID (0 = genel)
+     * @return {@code true} ise basarili gonderim
      */
-    public void sendPhoto(byte[] imageBytes, String caption, String chatId, int topicId) {
+    public boolean sendPhoto(byte[] imageBytes, String caption, String chatId, int topicId) {
         if (imageBytes == null || imageBytes.length == 0) {
             log.warn("[TELEGRAM-CLIENT] Image bytes bos, foto gonderimi atlaniyor");
-            return;
+            return false;
         }
 
-        doSendPhoto(chatId, imageBytes, caption, topicId);
+        return doSendPhoto(chatId, imageBytes, caption, topicId);
     }
 
     // ==================== INTERNAL ====================
@@ -196,8 +198,9 @@ public class TelegramClient {
      * @param image binary image verisi
      * @param caption HTML caption
      * @param topicId thread ID (0 ise kullanilmaz)
+     * @return {@code true} ise HTTP 200 basarili
      */
-    private void doSendPhoto(String chatId, byte[] image, String caption, int topicId) {
+    private boolean doSendPhoto(String chatId, byte[] image, String caption, int topicId) {
         try {
             String url = TELEGRAM_API_BASE + config.getBot().getToken() + "/sendPhoto";
             String boundary = "----ScyBorsaBoundary" + System.nanoTime() + java.util.concurrent.ThreadLocalRandom.current().nextInt(100_000);
@@ -216,16 +219,20 @@ public class TelegramClient {
             if (response.statusCode() == 200) {
                 log.info("[TELEGRAM-CLIENT] Foto gonderildi | chatId={} | {}KB",
                         chatId, image.length / 1024);
+                return true;
             } else {
                 log.error("[TELEGRAM-CLIENT] Foto gonderilemedi | status={} | response={}",
                         response.statusCode(), maskTokenInMessage(response.body()));
+                return false;
             }
 
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             log.error("[TELEGRAM-CLIENT] sendPhoto interrupted");
+            return false;
         } catch (Exception e) {
             log.error("[TELEGRAM-CLIENT] sendPhoto hatasi: {}", maskTokenInMessage(e.getMessage()));
+            return false;
         }
     }
 

@@ -41,6 +41,14 @@ velzon:
     api-key: ${VELZON_API_KEY:CHANGE_ME}
     connect-timeout-seconds: 10
     request-timeout-seconds: 15
+  ai:
+    url: ${VELZON_AI_URL:https://api.velzon.tr/api/ai/raw-query}
+    api-key: ${VELZON_AI_API_KEY:CHANGE_ME}
+    enabled: ${VELZON_AI_ENABLED:false}
+    timeout: 60
+    max-tokens: 500
+    temperature: 0.7
+    rate-limit: 1000
 
 cors:
   allowed-origins: http://localhost:8080
@@ -97,8 +105,8 @@ fintables:
 telegram:
   enabled: ${TELEGRAM_ENABLED:false}
   bot:
-    token: ${TELEGRAM_BOT_TOKEN:}
-    chat-id: ${TELEGRAM_CHAT_ID:}
+    token: ${TELEGRAM_BOT_TOKEN:CHANGE_ME}
+    chat-id: ${TELEGRAM_CHAT_ID:CHANGE_ME}
     topic-id: ${TELEGRAM_TOPIC_ID:0}
   ai:
     topic-id: ${TELEGRAM_AI_TOPIC_ID:8}
@@ -106,9 +114,22 @@ telegram:
     fallback-to-main: true
   screenshot:
     enabled: ${TELEGRAM_SCREENSHOT_ENABLED:false}
+    api-key: ${CHARTIMG_API_KEY:CHANGE_ME}
+    api-url: https://api.chart-img.com
+    layout-id: ${CHARTIMG_LAYOUT_ID:CHANGE_ME}
+    width: 1920
+    height: 1080
+    interval: 1D
+    theme: dark
+    timezone: Europe/Istanbul
+    format: png
+    timeout: 30
   kgs:
     filter-enabled: ${TELEGRAM_KGS_FILTER:false}
     min-score: ${TELEGRAM_KGS_MIN_SCORE:70}
+  kap:
+    topic-id: ${TELEGRAM_KAP_TOPIC_ID:0}
+    max-per-cycle: ${TELEGRAM_KAP_MAX_PER_CYCLE:5}
   chart-base-url: "https://www.tradingview.com/chart/?symbol=BIST:"
   send-rate-limit-ms: 200
 

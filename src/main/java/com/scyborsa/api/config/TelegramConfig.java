@@ -70,6 +70,25 @@ public class TelegramConfig {
             log.error("[TELEGRAM-CONFIG] telegram.enabled=true ama bot.chat-id bos! "
                     + "Mesaj gonderimleri basarisiz olacak.");
         }
+        if (screenshot.isEnabled()) {
+            if (screenshot.getApiKey() == null || screenshot.getApiKey().isBlank()) {
+                log.error("[TELEGRAM-CONFIG] screenshot.enabled=true ama api-key bos! "
+                        + "Chart screenshot'lari alinamayacak.");
+            }
+            if (screenshot.getLayoutId() == null || screenshot.getLayoutId().isBlank()) {
+                log.error("[TELEGRAM-CONFIG] screenshot.layout-id bos! "
+                        + "Chart screenshot'lari alinamayacak.");
+            }
+            if (screenshot.getTimeout() <= 0) {
+                log.error("[TELEGRAM-CONFIG] screenshot.timeout gecersiz: {}. "
+                        + "Pozitif bir deger olmalidir.", screenshot.getTimeout());
+            }
+            if (screenshot.getWidth() <= 0 || screenshot.getHeight() <= 0) {
+                log.error("[TELEGRAM-CONFIG] screenshot.width/height gecersiz: {}x{}. "
+                        + "Pozitif degerler olmalidir.",
+                        screenshot.getWidth(), screenshot.getHeight());
+            }
+        }
     }
 
     /**
@@ -106,12 +125,45 @@ public class TelegramConfig {
 
     /**
      * Chart screenshot ayarlari.
+     *
+     * <p>CHART-IMG API uzerinden TradingView chart screenshot'i alir.
+     * Telegram mesajlarina gorsel ek olarak gonderilir.</p>
      */
     @Getter
     @Setter
     public static class Screenshot {
         /** Chart screenshot ozelligi aktif mi? */
         private boolean enabled = false;
+
+        /** CHART-IMG API anahtari. */
+        private String apiKey;
+
+        /** CHART-IMG API URL'i. */
+        private String apiUrl = "https://api.chart-img.com";
+
+        /** TradingView paylasimli layout ID'si. */
+        private String layoutId = "";
+
+        /** Grafik genisligi (piksel). */
+        private int width = 1920;
+
+        /** Grafik yuksekligi (piksel). */
+        private int height = 1080;
+
+        /** Grafik zaman araligi. */
+        private String interval = "1D";
+
+        /** Grafik temasi (dark/light). */
+        private String theme = "dark";
+
+        /** Grafik saat dilimi. */
+        private String timezone = "Europe/Istanbul";
+
+        /** Grafik formati. */
+        private String format = "png";
+
+        /** API istek timeout suresi (saniye). */
+        private int timeout = 30;
     }
 
     /**
