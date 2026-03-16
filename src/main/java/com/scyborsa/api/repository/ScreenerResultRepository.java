@@ -29,6 +29,31 @@ import java.util.List;
 public interface ScreenerResultRepository extends JpaRepository<ScreenerResultModel, Long> {
 
     /**
+     * Belirli bir tarih aralığında Telegram'a gönderilmiş tarama sonuçlarını getirir.
+     *
+     * @param startDay başlangıç tarihi (dahil)
+     * @param endDay bitiş tarihi (dahil)
+     * @return tarama sonuçları listesi (oluşturulma zamanına göre azalan sırada)
+     */
+    @Query("SELECT sr FROM ScreenerResultModel sr WHERE sr.telegramSent = true " +
+           "AND sr.screenerDay BETWEEN :startDay AND :endDay ORDER BY sr.createTime DESC")
+    List<ScreenerResultModel> findTelegramSentBetweenDays(
+            @Param("startDay") LocalDate startDay, @Param("endDay") LocalDate endDay);
+
+    /**
+     * Belirli bir tarih aralığında Telegram'a gönderilmiş benzersiz tarama adlarını getirir.
+     *
+     * @param startDay başlangıç tarihi (dahil)
+     * @param endDay bitiş tarihi (dahil)
+     * @return benzersiz tarama adları listesi (alfabetik sırada)
+     */
+    @Query("SELECT DISTINCT sr.screenerName FROM ScreenerResultModel sr " +
+           "WHERE sr.telegramSent = true AND sr.screenerDay BETWEEN :startDay AND :endDay " +
+           "AND sr.screenerName IS NOT NULL ORDER BY sr.screenerName")
+    List<String> findDistinctScreenerNamesBetweenDays(
+            @Param("startDay") LocalDate startDay, @Param("endDay") LocalDate endDay);
+
+    /**
      * Belirli bir günün tüm tarama sonuçlarını getirir.
      *
      * @param screenerDay tarama günü
