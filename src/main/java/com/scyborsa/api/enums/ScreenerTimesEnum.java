@@ -16,7 +16,7 @@ import java.time.ZoneId;
  * <ul>
  *   <li><b>Açılış:</b> 09:40</li>
  *   <li><b>Sürekli İşlem:</b> 10:00 - 18:00</li>
- *   <li><b>Kapanış Seansı:</b> 18:00 - 18:10</li>
+ *   <li><b>Kapanış Seansı:</b> 18:00 - 18:12</li>
  * </ul>
  *
  * @see com.scyborsa.api.service.job.BistGunlukTaramalarJob
@@ -155,7 +155,7 @@ public enum ScreenerTimesEnum {
 
     private static final ZoneId ISTANBUL_ZONE = ZoneId.of("Europe/Istanbul");
     private static final LocalTime MARKET_OPEN = LocalTime.of(9, 40);
-    private static final LocalTime MARKET_CLOSE = LocalTime.of(18, 10);
+    private static final LocalTime MARKET_CLOSE = LocalTime.of(18, 15);
 
     /** Zaman diliminin string gösterimi (ör. "10:30"). */
     private final String timeStr;
@@ -240,7 +240,7 @@ public enum ScreenerTimesEnum {
     /**
      * Bu zamanın BIST işlem saatleri içinde olup olmadığını kontrol eder.
      *
-     * @return {@code true} ise 09:40 - 18:10 arası
+     * @return {@code true} ise 09:40 - 18:15 arası
      */
     public boolean isMarketHours() {
         LocalTime time = toLocalTime();

@@ -30,13 +30,13 @@ import java.util.stream.Collectors;
  *
  * <p><b>2-Session Sistemi:</b></p>
  * <ul>
- *   <li>Sabah (09:00-11:00): sentStocksMorning set'i</li>
- *   <li>Ogleden sonra (15:00-18:30): sentStocksAfternoon set'i</li>
- *   <li>Ara donem (11:00-15:00): sabah set'ini kullanir</li>
+ *   <li>Sabah (isMorningSession=true): sentStocksMorning set'i</li>
+ *   <li>Ogleden sonra (isAfternoonSession=true): sentStocksAfternoon set'i</li>
+ *   <li>Ara donem (ikisi de false): sabah set'ini kullanir</li>
  * </ul>
  *
- * <p><b>Dedup mekanizmasi:</b> In-memory Set (performans) + DB telegramSent flag (kalicilik).
- * Restart sonrasi in-memory set kaybolur ama findTodayUnsent() zaten gonderilenler icermez.</p>
+ * <p><b>Dedup mekanizmasi:</b> In-memory Set (performans) + zaman pencereli DB sorgusu.
+ * Son 10 dakikadaki gonderilmemis sonuclar alinir, session bazli dedup uygulanir.</p>
  *
  * @see TelegramClient
  * @see TelegramMessageFormatter
@@ -50,8 +50,6 @@ public class TelegramSendService {
     /** Istanbul saat dilimi. */
     private static final ZoneId ISTANBUL_ZONE = ZoneId.of("Europe/Istanbul");
 
-    /** Gruplanmis mesaj icin minimum tarama sonucu esigi. */
-    private static final int GROUPED_THRESHOLD = 2;
 
     /** Screener tarama sonuclari repository'si. */
     private final ScreenerResultRepository resultRepository;
@@ -87,11 +85,6 @@ public class TelegramSendService {
     /** Concurrent calismayi onleyen guard. */
     private final AtomicBoolean sending = new AtomicBoolean(false);
 
-    // ==================== SESSION ENUM ====================
-
-    /** Telegram gonderim session turleri (sabah, ogleden sonra, ara donem). */
-    private enum Session { MORNING, AFTERNOON, GAP }
-
     // ==================== PUBLIC API ====================
 
     /**
@@ -99,20 +92,23 @@ public class TelegramSendService {
      *
      * <p>Ana akis:</p>
      * <ol>
-     *   <li>findTodayUnsent() ile gonderilmemis kayitlari al</li>
+     *   <li>findRecentUnsent() ile son 10 dakikadaki gonderilmemis kayitlari al</li>
      *   <li>Session bazli dedup filtresi uygula</li>
      *   <li>stockName bazli grupla</li>
      *   <li>Her grup icin mesaj formatla ve gonder</li>
      *   <li>DB'de telegramSent=true isaretle</li>
      * </ol>
+     *
+     * @param isMorningSession sabah seansi mi (saat 11:00 oncesi)
+     * @param isAfternoonSession ogleden sonra seansi mi (saat 15:00 sonrasi)
      */
-    public void sendPendingMessages() {
+    public void sendPendingMessages(boolean isMorningSession, boolean isAfternoonSession) {
         if (!sending.compareAndSet(false, true)) {
             log.warn("[TELEGRAM-SEND] Onceki gonderim devam ediyor, atlaniyor");
             return;
         }
         try {
-            doSendPendingMessages();
+            doSendPendingMessages(isMorningSession, isAfternoonSession);
         } finally {
             sending.set(false);
         }
@@ -120,17 +116,21 @@ public class TelegramSendService {
 
     /**
      * Gercek gonderim mantigi. Concurrency guard sendPendingMessages()'da.
+     *
+     * @param isMorningSession sabah seansi mi
+     * @param isAfternoonSession ogleden sonra seansi mi
      */
-    private void doSendPendingMessages() {
+    private void doSendPendingMessages(boolean isMorningSession, boolean isAfternoonSession) {
         LocalDate today = LocalDate.now(ISTANBUL_ZONE);
         LocalTime now = LocalTime.now(ISTANBUL_ZONE);
-        Session session = determineSession(now);
-        Set<String> sentStocks = getSentStocksForSession(session);
+        LocalTime tenMinutesAgo = now.minusMinutes(10);
+        Set<String> sentStocks = getSentStocksForSession(isMorningSession, isAfternoonSession);
 
-        log.info("[TELEGRAM-SEND] Gonderim basliyor | Session: {} | Saat: {}", session, now);
+        log.info("[TELEGRAM-SEND] Gonderim basliyor | Sabah: {} | Ogleden sonra: {} | Saat: {}",
+                isMorningSession, isAfternoonSession, now);
 
-        // 1. DB'den gonderilmemis kayitlari al
-        List<ScreenerResultModel> unsent = resultRepository.findTodayUnsent(today);
+        // 1. DB'den son 10 dakikadaki gonderilmemis kayitlari al
+        List<ScreenerResultModel> unsent = resultRepository.findRecentUnsent(today, tenMinutesAgo, now);
         if (unsent.isEmpty()) {
             log.debug("[TELEGRAM-SEND] Gonderilecek kayit yok");
             return;
@@ -174,7 +174,7 @@ public class TelegramSendService {
 
                 // Mesaj formatla
                 String message;
-                boolean isGrouped = results.size() >= GROUPED_THRESHOLD;
+                boolean isGrouped = results.size() > 1;
                 if (isGrouped) {
                     message = messageFormatter.formatGroupedStockMessage(stockName, results);
                 } else {
@@ -214,7 +214,7 @@ public class TelegramSendService {
                 }
 
                 // Session set'ine ONCE ekle — DB hatasi olursa duplicate gonderim engellenir.
-                // DB write sonraki turda findTodayUnsent() ile tekrar denenebilir.
+                // DB write sonraki turda findRecentUnsent() ile tekrar denenebilir.
                 sentStocks.add(stockName);
                 totalSent++;
 
@@ -487,36 +487,21 @@ public class TelegramSendService {
     }
 
     /**
-     * Mevcut saate gore session belirler.
+     * Session flag'larina gore uygun dedup set'ini dondurur.
      *
-     * @param now Istanbul zamani
-     * @return session turu
-     */
-    private Session determineSession(LocalTime now) {
-        if (now.isBefore(LocalTime.of(9, 0))) {
-            return Session.GAP; // Pre-market: morning set'ini kirletme
-        } else if (now.isBefore(LocalTime.of(11, 0))) {
-            return Session.MORNING;
-        } else if (!now.isBefore(LocalTime.of(15, 0))) {
-            return Session.AFTERNOON;
-        }
-        return Session.GAP;
-    }
-
-    /**
-     * Session'a gore uygun dedup set'ini dondurur.
+     * <p>Sabah seansi (isMorningSession=true) veya ara donem (ikisi de false):
+     * sentStocksMorning set'ini kullanir. Ogleden sonra seansi (isAfternoonSession=true):
+     * sentStocksAfternoon set'ini kullanir.</p>
      *
-     * @param session aktif session
+     * @param isMorningSession sabah seansi mi
+     * @param isAfternoonSession ogleden sonra seansi mi
      * @return ilgili ConcurrentHashMap set'i
      */
-    private Set<String> getSentStocksForSession(Session session) {
-        return switch (session) {
-            case MORNING -> sentStocksMorning;
-            case AFTERNOON -> sentStocksAfternoon;
-            // GAP (11:00-14:59): sabah set'ini kullanir → sabah gonderilen hisseler
-            // GAP'ta da bastırılır. Ogleden sonra (AFTERNOON) yeni sinyal gelirse
-            // sentStocksAfternoon bos oldugundan tekrar gonderilir. Kasitli davranis.
-            case GAP -> sentStocksMorning;
-        };
+    private Set<String> getSentStocksForSession(boolean isMorningSession, boolean isAfternoonSession) {
+        if (isAfternoonSession) {
+            return sentStocksAfternoon;
+        }
+        // Sabah seansi VEYA ara donem (11:00-15:00): sabah set'ini kullanir
+        return sentStocksMorning;
     }
 }

@@ -42,6 +42,12 @@ public class TelegramClient {
     /** HTTP istek zaman asimi suresi. */
     private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(15);
 
+    /** 429 rate limit sonrasi maksimum retry sayisi. */
+    private static final int MAX_RETRY = 1;
+
+    /** retry_after icin maksimum bekleme suresi (saniye). */
+    private static final int MAX_RETRY_AFTER_SECONDS = 60;
+
     /** Telegram bot yapilandirma bilgileri. */
     private final TelegramConfig config;
 
@@ -175,6 +181,8 @@ public class TelegramClient {
                 log.info("[TELEGRAM-CLIENT] Mesaj gonderildi | chatId={} | topicId={} | {} karakter",
                         chatId, topicId, text.length());
                 return true;
+            } else if (response.statusCode() == 429) {
+                return handleRateLimitAndRetry(request, response, "sendMessage");
             } else {
                 log.error("[TELEGRAM-CLIENT] Mesaj gonderilemedi | status={} | response={}",
                         response.statusCode(), maskTokenInMessage(response.body()));
@@ -220,6 +228,8 @@ public class TelegramClient {
                 log.info("[TELEGRAM-CLIENT] Foto gonderildi | chatId={} | {}KB",
                         chatId, image.length / 1024);
                 return true;
+            } else if (response.statusCode() == 429) {
+                return handleRateLimitAndRetry(request, response, "sendPhoto");
             } else {
                 log.error("[TELEGRAM-CLIENT] Foto gonderilemedi | status={} | response={}",
                         response.statusCode(), maskTokenInMessage(response.body()));
@@ -287,6 +297,72 @@ public class TelegramClient {
 
         } catch (Exception e) {
             throw new RuntimeException("Multipart body olusturma hatasi", e);
+        }
+    }
+
+    /**
+     * 429 rate limit yanitini isler, retry_after suresi kadar bekler ve tekrar dener.
+     *
+     * <p>Telegram API'nin {@code retry_after} degerini JSON body'den parse eder.
+     * Maksimum {@value MAX_RETRY_AFTER_SECONDS} saniye bekler, 1 kez retry yapar.</p>
+     *
+     * @param request orijinal HTTP istegi
+     * @param response 429 yaniti
+     * @param operation islem adi (loglama icin)
+     * @return retry basarili ise {@code true}
+     */
+    private boolean handleRateLimitAndRetry(HttpRequest request, HttpResponse<String> response, String operation) {
+        int retryAfter = parseRetryAfter(response.body());
+        if (retryAfter > MAX_RETRY_AFTER_SECONDS) {
+            log.error("[TELEGRAM-CLIENT] {} rate limit | retry_after={}s cok yuksek, atlaniyor", operation, retryAfter);
+            return false;
+        }
+
+        log.warn("[TELEGRAM-CLIENT] {} rate limit (429) | {}s bekleniyor...", operation, retryAfter);
+        try {
+            Thread.sleep(retryAfter * 1000L);
+
+            HttpResponse<String> retryResponse = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            if (retryResponse.statusCode() == 200) {
+                log.info("[TELEGRAM-CLIENT] {} retry basarili", operation);
+                return true;
+            } else {
+                log.error("[TELEGRAM-CLIENT] {} retry basarisiz | status={}", operation, retryResponse.statusCode());
+                return false;
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            log.error("[TELEGRAM-CLIENT] {} retry interrupted", operation);
+            return false;
+        } catch (Exception e) {
+            log.error("[TELEGRAM-CLIENT] {} retry hatasi: {}", operation, maskTokenInMessage(e.getMessage()));
+            return false;
+        }
+    }
+
+    /**
+     * Telegram 429 yanitindan retry_after degerini parse eder.
+     *
+     * <p>Ornek yanit: {@code {"ok":false,"error_code":429,"description":"Too Many Requests: retry after 35","parameters":{"retry_after":35}}}</p>
+     *
+     * @param body JSON yanit body'si
+     * @return retry_after saniye degeri, parse edilemezse 5
+     */
+    private int parseRetryAfter(String body) {
+        if (body == null || body.isBlank()) return 5;
+        try {
+            // "retry_after":35 pattern'ini bul
+            int idx = body.indexOf("\"retry_after\":");
+            if (idx < 0) return 5;
+            String after = body.substring(idx + 14).trim();
+            StringBuilder num = new StringBuilder();
+            for (char c : after.toCharArray()) {
+                if (Character.isDigit(c)) num.append(c);
+                else break;
+            }
+            return num.length() > 0 ? Integer.parseInt(num.toString()) : 5;
+        } catch (Exception e) {
+            return 5;
         }
     }
 

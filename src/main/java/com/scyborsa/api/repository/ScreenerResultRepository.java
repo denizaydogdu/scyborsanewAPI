@@ -241,6 +241,26 @@ public interface ScreenerResultRepository extends JpaRepository<ScreenerResultMo
     List<ScreenerResultModel> findTodayUnsent(@Param("screenerDay") LocalDate screenerDay);
 
     /**
+     * Belirli bir zaman penceresi icindeki gonderilmemis tarama sonuclarini getirir.
+     *
+     * <p>SC projesi ile uyumlu zaman pencereli sorgulama. Sadece {@code fromTime} ile
+     * {@code toTime} arasindaki kayitlari dondurur (son 10 dakika gibi).</p>
+     *
+     * @param day tarama gunu
+     * @param fromTime baslangic zamani (dahil)
+     * @param toTime bitis zamani (dahil)
+     * @return gonderilmemis tarama sonuclari (stockName ve screenerTime'a gore sirali)
+     */
+    @Query("SELECT sr FROM ScreenerResultModel sr WHERE sr.screenerDay = :day " +
+           "AND sr.screenerTime >= :fromTime AND sr.screenerTime <= :toTime " +
+           "AND (sr.telegramSent = false OR sr.telegramSent IS NULL) " +
+           "ORDER BY sr.stockName, sr.screenerTime")
+    List<ScreenerResultModel> findRecentUnsent(
+            @Param("day") LocalDate day,
+            @Param("fromTime") LocalTime fromTime,
+            @Param("toTime") LocalTime toTime);
+
+    /**
      * Belirtilen kayitlari Telegram gonderildi olarak toplu isaretler.
      *
      * <p><b>Onemli:</b> {@code screenerCount} ve {@code commonNames} parametreleri

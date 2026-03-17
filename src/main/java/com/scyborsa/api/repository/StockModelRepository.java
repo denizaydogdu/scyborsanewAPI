@@ -60,4 +60,12 @@ public interface StockModelRepository extends JpaRepository<StockModel, Long> {
      */
     @Query("SELECT COUNT(s) FROM StockModel s WHERE s.isBanned = false")
     long countActiveStocks();
+
+    /**
+     * Yasaklı hisselerin borsa kodlarını döndürür.
+     *
+     * @return yasaklı hisse kodları listesi
+     */
+    @Query("SELECT s.stockName FROM StockModel s WHERE s.isBanned = true")
+    List<String> findBannedStockNames();
 }

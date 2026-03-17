@@ -1,0 +1,235 @@
+{
+  "columns": [
+    "name",
+    "description",
+    "logoid",
+    "update_mode",
+    "type",
+    "typespecs",
+    "close",
+    "pricescale",
+    "minmov",
+    "fractional",
+    "minmove2",
+    "currency",
+    "change",
+    "volume",
+    "relative_volume_10d_calc",
+    "market_cap_basic",
+    "fundamental_currency_code",
+    "price_earnings_ttm",
+    "earnings_per_share_diluted_ttm",
+    "earnings_per_share_diluted_yoy_growth_ttm",
+    "dividends_yield_current",
+    "sector.tr",
+    "market",
+    "sector",
+    "Recommend.All",
+    "exchange",
+    "ATR"
+  ],
+  "filter": [
+    {
+      "left": "RSI",
+      "operation": "in_range",
+      "right": [
+        30,
+        70
+      ]
+    },
+    {
+      "left": "ADX",
+      "operation": "greater",
+      "right": 20
+    },
+    {
+      "left": "ADX+DI",
+      "operation": "greater",
+      "right": "ADX-DI"
+    },
+    {
+      "left": "EMA5",
+      "operation": "less",
+      "right": "close"
+    },
+    {
+      "left": "EMA10",
+      "operation": "less",
+      "right": "close"
+    },
+    {
+      "left": "EMA144",
+      "operation": "less",
+      "right": "close"
+    },
+    {
+      "left": "EMA200",
+      "operation": "less",
+      "right": "close"
+    },
+    {
+      "left": "MACD.macd",
+      "operation": "greater",
+      "right": "MACD.signal"
+    },
+    {
+      "left": "P.SAR",
+      "operation": "less",
+      "right": "close"
+    },
+    {
+      "left": "MoneyFlow",
+      "operation": "greater",
+      "right": 50
+    },
+    {
+      "left": "ChaikinMoneyFlow",
+      "operation": "greater",
+      "right": 0.05
+    },
+    {
+      "left": "HullMA9",
+      "operation": "less",
+      "right": "close"
+    },
+    {
+      "left": "Stoch.RSI.K",
+      "operation": "greater",
+      "right": "Stoch.RSI.D"
+    },
+    {
+      "left": "Ichimoku.CLine",
+      "operation": "less",
+      "right": "close"
+    },
+    {
+      "left": "close",
+      "operation": "greater",
+      "right": "open"
+    },
+    {
+      "left": "change",
+      "operation": "less",
+      "right": 7
+    },
+    {
+      "left": "submarket",
+      "operation": "in_range",
+      "right": [
+        "MAIN",
+        "STARS"
+      ]
+    }
+  ],
+  "ignore_unknown_fields": false,
+  "options": {
+    "lang": "tr"
+  },
+  "range": [
+    0,
+    600
+  ],
+  "sort": {
+    "sortBy": "change",
+    "sortOrder": "asc"
+  },
+  "symbols": {},
+  "markets": [
+    "turkey"
+  ],
+  "filter2": {
+    "operator": "and",
+    "operands": [
+      {
+        "operation": {
+          "operator": "or",
+          "operands": [
+            {
+              "operation": {
+                "operator": "and",
+                "operands": [
+                  {
+                    "expression": {
+                      "left": "type",
+                      "operation": "equal",
+                      "right": "stock"
+                    }
+                  },
+                  {
+                    "expression": {
+                      "left": "typespecs",
+                      "operation": "has",
+                      "right": [
+                        "common"
+                      ]
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "operation": {
+                "operator": "and",
+                "operands": [
+                  {
+                    "expression": {
+                      "left": "type",
+                      "operation": "equal",
+                      "right": "stock"
+                    }
+                  },
+                  {
+                    "expression": {
+                      "left": "typespecs",
+                      "operation": "has",
+                      "right": [
+                        "preferred"
+                      ]
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "operation": {
+                "operator": "and",
+                "operands": [
+                  {
+                    "expression": {
+                      "left": "type",
+                      "operation": "equal",
+                      "right": "dr"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "operation": {
+                "operator": "and",
+                "operands": [
+                  {
+                    "expression": {
+                      "left": "type",
+                      "operation": "equal",
+                      "right": "fund"
+                    }
+                  },
+                  {
+                    "expression": {
+                      "left": "typespecs",
+                      "operation": "has_none_of",
+                      "right": [
+                        "etf"
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

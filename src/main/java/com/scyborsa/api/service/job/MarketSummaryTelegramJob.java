@@ -13,6 +13,7 @@ import com.scyborsa.api.utils.ProfileUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.scheduling.annotation.Schedules;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -57,9 +58,30 @@ public class MarketSummaryTelegramJob {
 
     /**
      * Piyasa özeti Telegram gönderimini tetikler.
-     * Saatte bir çalışır (10:02, 11:02... 18:02).
+     *
+     * <p>SC ile birebir uyumlu 11 sabit zamanda çalışır:</p>
+     * <ul>
+     *   <li>Açılış: 09:57, 10:02, 10:15, 10:35</li>
+     *   <li>Gün içi: 11:10, 11:30, 12:02-17:02 saatlik</li>
+     *   <li>Kapanış: 17:32, 18:02, 18:12</li>
+     * </ul>
      */
-    @Scheduled(cron = "0 2 10-18 * * MON-FRI", zone = "Europe/Istanbul")
+    @Schedules({
+            // Açılış saatleri (SC off-cycle)
+            @Scheduled(cron = "0 57 9 * * MON-FRI", zone = "Europe/Istanbul"),
+            @Scheduled(cron = "0 2 10 * * MON-FRI", zone = "Europe/Istanbul"),
+            @Scheduled(cron = "0 15 10 * * MON-FRI", zone = "Europe/Istanbul"),
+            @Scheduled(cron = "0 35 10 * * MON-FRI", zone = "Europe/Istanbul"),
+            // Gün içi (SC off-cycle)
+            @Scheduled(cron = "0 10 11 * * MON-FRI", zone = "Europe/Istanbul"),
+            @Scheduled(cron = "0 30 11 * * MON-FRI", zone = "Europe/Istanbul"),
+            // Gün içi saatlik (12:02-17:02)
+            @Scheduled(cron = "0 2 12-17 * * MON-FRI", zone = "Europe/Istanbul"),
+            // Kapanış saatleri (SC off-cycle)
+            @Scheduled(cron = "0 32 17 * * MON-FRI", zone = "Europe/Istanbul"),
+            @Scheduled(cron = "0 2 18 * * MON-FRI", zone = "Europe/Istanbul"),
+            @Scheduled(cron = "0 12 18 * * MON-FRI", zone = "Europe/Istanbul")
+    })
     public void run() {
         if (!profileUtils.isProdProfile()) return;
         if (!telegramConfig.isEnabled()) return;

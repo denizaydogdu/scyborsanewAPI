@@ -91,6 +91,11 @@ public class ScreenerExecutionService {
 
         for (ScreenerTypeEnum type : ScreenerTypeEnum.values()) {
             try {
+                // MARKET_SUMMARY sadece Telegram job'u için; günlük taramada çalıştırılmaz (SC uyumluluk)
+                if (type == ScreenerTypeEnum.MARKET_SUMMARY) {
+                    continue;
+                }
+
                 // Scan body yoksa API çağrısı yapılmaz, sleep gerekmez
                 if (scanBodyRegistry.getScanBodies(type).isEmpty()) {
                     continue;
