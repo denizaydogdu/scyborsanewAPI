@@ -176,26 +176,38 @@ public class FintablesFonPozisyonServiceImpl implements FintablesFonPozisyonServ
      */
     private FonPozisyon parseRow(Element row) {
         Elements cells = row.select("td");
-        if (cells.size() < 3) {
+        if (cells.size() < 2) {
             return null;
         }
 
         // Fon kodu: link'ten çıkar
         Element fonLink = row.selectFirst("a[href*=/fonlar/]");
-        if (fonLink == null) {
-            return null;
+        String fonKodu = null;
+        if (fonLink != null) {
+            fonKodu = extractFonKodu(fonLink.attr("href"));
         }
-        String href = fonLink.attr("href");
-        String fonKodu = extractFonKodu(href);
+        // Fallback: div.text-sm class'indan fon kodu (SC uyumlu)
+        if (fonKodu == null || fonKodu.isBlank()) {
+            Element codeDiv = cells.get(0).selectFirst("div.text-sm");
+            if (codeDiv != null) {
+                fonKodu = codeDiv.text().trim();
+            }
+        }
         if (fonKodu == null || fonKodu.isBlank()) {
             return null;
         }
 
-        // Nominal: sayısal hücre (virgüllü format: "4,910,000")
-        long nominal = parseNominal(cells.get(1).text().trim());
+        // SC uyumlu: cells[1] icerisinde nested div'ler — nominal (ilk div), agirlik (ikinci div)
+        Elements posDivs = cells.get(1).select("div");
+        long nominal = 0;
+        double agirlik = 0.0;
 
-        // Ağırlık: yüzde hücre (ondalıklı format: "16.32")
-        double agirlik = parseAgirlik(cells.get(2).text().trim());
+        if (!posDivs.isEmpty()) {
+            nominal = parseNominal(posDivs.get(0).text().trim());
+        }
+        if (posDivs.size() > 1) {
+            agirlik = parseAgirlik(posDivs.get(1).text().trim());
+        }
 
         return FonPozisyon.builder()
                 .fonKodu(fonKodu)

@@ -190,10 +190,27 @@ public class TelegramSendService {
                 byte[] screenshot = captureScreenshotIfEnabled(stockName);
                 boolean sent;
                 if (screenshot != null && screenshot.length > 0) {
-                    String caption = buildPhotoCaption(stockName, results);
+                    // Caption 1024 byte (UTF-8) limitine uygun parcala
+                    byte[] msgBytes = message.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+                    String caption;
+                    String overflow = null;
+                    if (msgBytes.length <= 1024) {
+                        caption = message;
+                    } else {
+                        // Ilk 1024 byte'i caption, kalanini ikinci mesaj olarak gonder
+                        caption = truncateCaptionToBytes(message, 1024);
+                        // Overflow: caption'dan sonraki kisim
+                        int captionCharLen = caption.length() - 3; // "..." haric
+                        overflow = message.substring(captionCharLen);
+                    }
                     sent = telegramClient.sendPhoto(screenshot, caption);
                     if (sent) {
                         log.info("[TELEGRAM-SEND] {} screenshot ile gonderildi", stockName);
+                        // Caption asmissa devamini ayri mesaj olarak gonder
+                        if (overflow != null && !overflow.isBlank()) {
+                            telegramClient.sendHtmlMessage(overflow);
+                            log.info("[TELEGRAM-SEND] {} caption devami ayri mesaj gonderildi", stockName);
+                        }
                     } else {
                         log.warn("[TELEGRAM-SEND] {} screenshot gonderilemedi, text fallback", stockName);
                         sent = telegramClient.sendHtmlMessage(message);
@@ -212,6 +229,9 @@ public class TelegramSendService {
                 } else {
                     singleCount++;
                 }
+
+                // Hisseler arasi ayirici — bir sonraki hisse oncesi
+                telegramClient.sendHtmlMessage("****************************************");
 
                 // Session set'ine ONCE ekle — DB hatasi olursa duplicate gonderim engellenir.
                 // DB write sonraki turda findRecentUnsent() ile tekrar denenebilir.
@@ -447,46 +467,6 @@ public class TelegramSendService {
     }
 
     /**
-     * Telegram sendPhoto icin kisa caption olusturur.
-     *
-     * <p>Telegram photo caption limiti 1024 karakter.
-     * Hisse adi, fiyat, degisim yuzdesi ve tarama isimlerini icerir.</p>
-     *
-     * @param stockName hisse kodu
-     * @param results hisseye ait tarama sonuclari
-     * @return HTML formatli caption metni
-     */
-    private String buildPhotoCaption(String stockName, List<ScreenerResultModel> results) {
-        ScreenerResultModel latest = results.get(results.size() - 1);
-        String screenerNames = results.stream()
-                .map(ScreenerResultModel::getScreenerName)
-                .filter(Objects::nonNull)
-                .distinct()
-                .collect(Collectors.joining(", "));
-
-        StringBuilder sb = new StringBuilder();
-        sb.append("<b>").append(stockName).append("</b>");
-        if (latest.getPrice() != null) {
-            sb.append(" | ").append(String.format("%.2f TL", latest.getPrice()));
-        }
-        if (latest.getPercentage() != null) {
-            String sign = latest.getPercentage() >= 0 ? "+" : "";
-            sb.append(" (").append(sign).append(String.format("%.2f%%", latest.getPercentage())).append(")");
-        }
-        if (!screenerNames.isEmpty()) {
-            // Screener isimlerini 800 karakterle sinirla — HTML tag kesilmesini onle
-            String safeNames = screenerNames.length() > 800 ? screenerNames.substring(0, 797) + "..." : screenerNames;
-            sb.append("\n").append(safeNames);
-        }
-        // Telegram caption limiti: 1024 karakter
-        if (sb.length() > 1024) {
-            sb.setLength(1021);
-            sb.append("...");
-        }
-        return sb.toString();
-    }
-
-    /**
      * Session flag'larina gore uygun dedup set'ini dondurur.
      *
      * <p>Sabah seansi (isMorningSession=true) veya ara donem (ikisi de false):
@@ -503,5 +483,56 @@ public class TelegramSendService {
         }
         // Sabah seansi VEYA ara donem (11:00-15:00): sabah set'ini kullanir
         return sentStocksMorning;
+    }
+
+    /**
+     * Telegram photo caption'i UTF-8 byte limitine gore truncate eder.
+     *
+     * <p>SC uyumlu: Telegram sendPhoto caption limiti 1024 byte (UTF-8).
+     * Turkce karakterler 2 byte oldugu icin karakter sayisi degil byte sayisi kontrol edilir.</p>
+     *
+     * @param text orijinal mesaj metni
+     * @param maxBytes maksimum byte limiti (1024)
+     * @return truncate edilmis veya orijinal metin
+     */
+    private String truncateCaptionToBytes(String text, int maxBytes) {
+        byte[] bytes = text.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        if (bytes.length <= maxBytes) {
+            return text;
+        }
+        log.warn("[TELEGRAM-SEND] Caption truncated: {} bytes -> {} bytes", bytes.length, maxBytes);
+        // UTF-8 safe truncation: karakter ortasinda kesmemek icin geri git
+        int end = maxBytes - 3; // "..." icin yer ayir
+        while (end > 0 && (bytes[end] & 0xC0) == 0x80) {
+            end--; // UTF-8 continuation byte'larini atla
+        }
+        String truncated = new String(bytes, 0, end, java.nio.charset.StandardCharsets.UTF_8);
+        // HTML tag ortasinda kesmemek icin son acik '<' varsa onu da kes
+        int lastOpenTag = truncated.lastIndexOf('<');
+        int lastCloseTag = truncated.lastIndexOf('>');
+        if (lastOpenTag > lastCloseTag) {
+            // Acik tag var ama kapanmamis — tag'dan once kes
+            truncated = truncated.substring(0, lastOpenTag);
+        }
+        // Acik HTML tag'lari kapat (b, i, code, a)
+        String[] tags = {"b", "i", "code", "a"};
+        for (String tag : tags) {
+            int opens = countOccurrences(truncated, "<" + tag + ">") + countOccurrences(truncated, "<" + tag + " ");
+            int closes = countOccurrences(truncated, "</" + tag + ">");
+            for (int i = 0; i < opens - closes; i++) {
+                truncated += "</" + tag + ">";
+            }
+        }
+        return truncated + "...";
+    }
+
+    private int countOccurrences(String text, String sub) {
+        int count = 0;
+        int idx = 0;
+        while ((idx = text.indexOf(sub, idx)) != -1) {
+            count++;
+            idx += sub.length();
+        }
+        return count;
     }
 }

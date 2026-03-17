@@ -115,6 +115,7 @@ public class MarketSummaryTelegramJob {
             if (message != null) {
                 boolean sent = telegramClient.sendHtmlMessage(message);
                 if (sent) {
+                    telegramClient.sendHtmlMessage("****************************************");
                     log.info("[MARKET-SUMMARY-JOB] Piyasa özeti gönderildi");
                 } else {
                     log.warn("[MARKET-SUMMARY-JOB] Mesaj gönderilemedi");

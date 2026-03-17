@@ -73,6 +73,7 @@ public class AkdPiyasaOzetiJob {
             if (message != null) {
                 boolean sent = telegramClient.sendHtmlMessage(message);
                 if (sent) {
+                    telegramClient.sendHtmlMessage("****************************************");
                     log.info("[AKD-OZET-JOB] Piyasa kurumsal özet gönderildi");
                 } else {
                     log.warn("[AKD-OZET-JOB] Mesaj gönderilemedi");

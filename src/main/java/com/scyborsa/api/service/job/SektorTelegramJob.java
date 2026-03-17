@@ -82,6 +82,7 @@ public class SektorTelegramJob {
             if (message != null) {
                 boolean sent = telegramClient.sendHtmlMessage(message);
                 if (sent) {
+                    telegramClient.sendHtmlMessage("****************************************");
                     log.info("[SEKTOR-JOB] Sektör özeti gönderildi");
                 } else {
                     log.warn("[SEKTOR-JOB] Mesaj gönderilemedi");

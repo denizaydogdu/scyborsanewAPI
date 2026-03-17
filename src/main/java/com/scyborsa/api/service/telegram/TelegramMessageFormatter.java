@@ -144,26 +144,28 @@ public class TelegramMessageFormatter {
         sb.append(buildKurumDagilimiSection(stockName));
         sb.append(buildTakasDagilimiSection(stockName));
 
-        // TP/SL
-        if (tp != null && tp > 0) {
-            double tpPct = price != null && price > 0 ? ((tp - price) / price) * 100 : 0;
-            sb.append(String.format("🎯 <b>TP:</b> <code>%.2f ₺</code> (%+.1f%%)\n", tp, tpPct));
-        }
-        if (sl != null && sl > 0) {
-            double slPct = price != null && price > 0 ? ((sl - price) / price) * 100 : 0;
-            sb.append(String.format("🛑 <b>SL:</b> <code>%.2f ₺</code> (%.1f%%)\n", sl, slPct));
-        }
+        // TP/SL devre dışı — T017 ile aktif edilebilir
+        // if (tp != null && tp > 0) {
+        //     double tpPct = price != null && price > 0 ? ((tp - price) / price) * 100 : 0;
+        //     sb.append(String.format("🎯 <b>TP:</b> <code>%.2f ₺</code> (%+.1f%%)\n", tp, tpPct));
+        // }
+        // if (sl != null && sl > 0) {
+        //     double slPct = price != null && price > 0 ? ((sl - price) / price) * 100 : 0;
+        //     sb.append(String.format("🛑 <b>SL:</b> <code>%.2f ₺</code> (%.1f%%)\n", sl, slPct));
+        // }
         sb.append("\n");
 
         // Tarama bilgisi
         int distinctCount = (int) results.stream().map(ScreenerResultModel::getScreenerName).distinct().count();
-        sb.append(String.format("📋 <b>%d ortak tarama:</b> %s\n", distinctCount, escapeHtml(commonNames)));
+        sb.append(String.format("📋 <b>%d ortak tarama</b>\n", distinctCount));
 
         if (firstTime != null && lastTime != null) {
             sb.append(String.format("⏰ İlk sinyal: %s | Son: %s\n",
                     firstTime.format(TIME_FORMATTER), lastTime.format(TIME_FORMATTER)));
         }
 
+        sb.append(String.format("🕐 <b>Saat:</b> %s\n",
+                ZonedDateTime.now(ISTANBUL_ZONE).format(DATETIME_FORMATTER)));
         sb.append(String.format("📈 <a href=\"%s\">TradingView</a>\n\n", chartUrl));
         sb.append("🤖 <i>ScyBorsa Bot</i>");
 
@@ -212,20 +214,23 @@ public class TelegramMessageFormatter {
         sb.append(buildKurumDagilimiSection(stockName));
         sb.append(buildTakasDagilimiSection(stockName));
 
-        if (tp != null && tp > 0) {
-            double tpPct = price != null && price > 0 ? ((tp - price) / price) * 100 : 0;
-            sb.append(String.format("🎯 <b>TP:</b> <code>%.2f ₺</code> (%+.1f%%)\n", tp, tpPct));
-        }
-        if (sl != null && sl > 0) {
-            double slPct = price != null && price > 0 ? ((sl - price) / price) * 100 : 0;
-            sb.append(String.format("🛑 <b>SL:</b> <code>%.2f ₺</code> (%.1f%%)\n", sl, slPct));
-        }
+        // TP/SL devre dışı — T017 ile aktif edilebilir
+        // if (tp != null && tp > 0) {
+        //     double tpPct = price != null && price > 0 ? ((tp - price) / price) * 100 : 0;
+        //     sb.append(String.format("🎯 <b>TP:</b> <code>%.2f ₺</code> (%+.1f%%)\n", tp, tpPct));
+        // }
+        // if (sl != null && sl > 0) {
+        //     double slPct = price != null && price > 0 ? ((sl - price) / price) * 100 : 0;
+        //     sb.append(String.format("🛑 <b>SL:</b> <code>%.2f ₺</code> (%.1f%%)\n", sl, slPct));
+        // }
         sb.append("\n");
 
-        sb.append(String.format("📋 <b>Tarama:</b> <i>%s</i>\n", escapeHtml(result.getScreenerName())));
+        sb.append("📋 <b>1 tarama</b>\n");
         if (result.getScreenerTime() != null) {
             sb.append(String.format("⏰ Sinyal: %s\n", result.getScreenerTime().format(TIME_FORMATTER)));
         }
+        sb.append(String.format("🕐 <b>Saat:</b> %s\n",
+                ZonedDateTime.now(ISTANBUL_ZONE).format(DATETIME_FORMATTER)));
         sb.append(String.format("📈 <a href=\"%s\">TradingView</a>\n\n", chartUrl));
         sb.append("🤖 <i>ScyBorsa Bot</i>");
 
@@ -280,11 +285,14 @@ public class TelegramMessageFormatter {
      * FintablesSummary verisi fetch eder. Servis yoksa null doner.
      */
     private FintablesSummaryDTO fetchFintablesSummary(String stockName) {
-        if (fintablesSummaryService == null) return null;
+        if (fintablesSummaryService == null) {
+            log.warn("[FORMATTER] fintablesSummaryService NULL — bean inject edilemedi");
+            return null;
+        }
         try {
             return fintablesSummaryService.getStockSummary(stockName);
         } catch (Exception e) {
-            log.debug("[FORMATTER] Fintables summary hatasi ({}): {}", stockName, e.getMessage());
+            log.warn("[FORMATTER] Fintables summary hatasi ({}): {}", stockName, e.getMessage());
             return null;
         }
     }

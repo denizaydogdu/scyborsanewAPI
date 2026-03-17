@@ -69,7 +69,7 @@ public class FintablesSummaryServiceImpl implements FintablesSummaryService {
             String body = fintablesApiClient.get(url);
 
             if (body == null || body.isBlank()) {
-                log.debug("[FintablesSummary] Boş response: stockName={}", stockName);
+                log.warn("[FintablesSummary] Boş response: stockName={}", stockName);
                 return null;
             }
 
