@@ -10,13 +10,14 @@ import com.scyborsa.api.utils.ProfileUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.scheduling.annotation.Schedules;
 import org.springframework.stereotype.Component;
 
 /**
  * AKD Piyasa Özeti Telegram gönderim job'u.
  *
- * <p>Her 30 dakikada bir top 5 alıcı ve top 5 satıcı kurumları
- * Telegram'a gönderir. Seans saatlerinde çalışır (10:03-18:33).</p>
+ * <p>SC ile birebir uyumlu 18 sabit zamanda top 5 alıcı ve top 5 satıcı
+ * kurumları Telegram'a gönderir.</p>
  *
  * @see AkdPiyasaOzetiTelegramBuilder
  * @see BrokerageAkdListService
@@ -43,9 +44,23 @@ public class AkdPiyasaOzetiJob {
 
     /**
      * AKD piyasa özeti Telegram gönderimini tetikler.
-     * Her 30 dakikada bir çalışır (10:03, 10:33, 11:03... 17:33).
+     *
+     * <p>SC ile birebir uyumlu 18 sabit zamanda çalışır:</p>
+     * <ul>
+     *   <li>10:03, 10:38</li>
+     *   <li>11:08, 11:38, 12:08, 12:38, 13:08, 13:38</li>
+     *   <li>14:08, 14:38, 15:08, 15:38, 16:08, 16:38</li>
+     *   <li>17:08, 17:38, 17:58, 18:08</li>
+     * </ul>
      */
-    @Scheduled(cron = "0 3/30 10-18 * * MON-FRI", zone = "Europe/Istanbul")
+    @Schedules({
+            @Scheduled(cron = "0 3 10 * * MON-FRI", zone = "Europe/Istanbul"),
+            @Scheduled(cron = "0 38 10 * * MON-FRI", zone = "Europe/Istanbul"),
+            @Scheduled(cron = "0 8 11-17 * * MON-FRI", zone = "Europe/Istanbul"),
+            @Scheduled(cron = "0 38 11-17 * * MON-FRI", zone = "Europe/Istanbul"),
+            @Scheduled(cron = "0 58 17 * * MON-FRI", zone = "Europe/Istanbul"),
+            @Scheduled(cron = "0 8 18 * * MON-FRI", zone = "Europe/Istanbul")
+    })
     public void run() {
         if (!profileUtils.isProdProfile()) return;
         if (!telegramConfig.isEnabled()) return;

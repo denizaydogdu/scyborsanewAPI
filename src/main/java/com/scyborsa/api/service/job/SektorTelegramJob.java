@@ -10,6 +10,7 @@ import com.scyborsa.api.utils.ProfileUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.scheduling.annotation.Schedules;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -45,9 +46,30 @@ public class SektorTelegramJob {
 
     /**
      * Sektör özeti Telegram gönderimini tetikler.
-     * Saatte bir çalışır (10:33, 11:33... 18:33).
+     *
+     * <p>SC ile birebir uyumlu 12 sabit zamanda çalışır:</p>
+     * <ul>
+     *   <li>Açılış sonrası: 10:33</li>
+     *   <li>Sabah: 11:03, 11:33</li>
+     *   <li>Gün içi saatlik: 12:03-17:03</li>
+     *   <li>Kapanış öncesi: 17:33</li>
+     *   <li>Kapanış sonrası: 18:03, 18:13</li>
+     * </ul>
      */
-    @Scheduled(cron = "0 33 10-18 * * MON-FRI", zone = "Europe/Istanbul")
+    @Schedules({
+            // Açılış sonrası
+            @Scheduled(cron = "0 33 10 * * MON-FRI", zone = "Europe/Istanbul"),
+            // Sabah yarım saatlik
+            @Scheduled(cron = "0 3 11 * * MON-FRI", zone = "Europe/Istanbul"),
+            @Scheduled(cron = "0 33 11 * * MON-FRI", zone = "Europe/Istanbul"),
+            // Gün içi saatlik (12:03-17:03)
+            @Scheduled(cron = "0 3 12-17 * * MON-FRI", zone = "Europe/Istanbul"),
+            // Kapanış öncesi
+            @Scheduled(cron = "0 33 17 * * MON-FRI", zone = "Europe/Istanbul"),
+            // Kapanış sonrası
+            @Scheduled(cron = "0 3 18 * * MON-FRI", zone = "Europe/Istanbul"),
+            @Scheduled(cron = "0 13 18 * * MON-FRI", zone = "Europe/Istanbul")
+    })
     public void run() {
         if (!profileUtils.isProdProfile()) return;
         if (!telegramConfig.isEnabled()) return;
