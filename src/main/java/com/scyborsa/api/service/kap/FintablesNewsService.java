@@ -222,7 +222,7 @@ public class FintablesNewsService {
 
         // 1. Topic feed
         try {
-            FintablesTopicFeedResponseDto feedResponse = fintablesApiClient.getTopicFeed(15);
+            FintablesTopicFeedResponseDto feedResponse = fintablesApiClient.getTopicFeed(50);
             if (feedResponse != null && feedResponse.getResults() != null) {
                 for (FintablesTopicFeedItemDto item : feedResponse.getResults()) {
                     categorizeTopicFeedItem(item, marketItems, kapItems, seenTitles);
