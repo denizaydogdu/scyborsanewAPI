@@ -9,6 +9,9 @@ import com.scyborsa.api.dto.fund.FundStatsDto;
 import com.scyborsa.api.dto.fund.FundTimeSeriesDto;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 import java.net.URLEncoder;
@@ -22,8 +25,8 @@ import java.util.Map;
  * TEFAS fon verilerini api.velzon.tr uzerinden saglayan servis.
  *
  * <p>VelzonApiClient kullanarak TEFAS Fund API endpoint'lerini cagirir.
- * Fon listesi volatile cache ile saklanir (varsayilan TTL: 120 saniye,
- * double-check locking).</p>
+ * Fon listesi volatile cache ile saklanir (varsayilan TTL: 4 saat,
+ * double-check locking). Startup'ta {@link #warmUpCache()} ile on-yukleme yapilir.</p>
  *
  * <p>api.velzon.tr response formati: {@code {success: true, data: [...], pagination: {...}}}.
  * {@code data} dizisi extract edilip {@link FundDto} listesine donusturulur.</p>
@@ -51,8 +54,8 @@ public class FundService {
     /** Cache kilit nesnesi. */
     private final Object cacheLock = new Object();
 
-    /** Cache TTL (saniye cinsinden). */
-    @Value("${fund.cache.ttl-seconds:120}")
+    /** Cache TTL (saniye cinsinden, varsayilan 4 saat). */
+    @Value("${fund.cache.ttl-seconds:14400}")
     private int cacheTtlSeconds;
 
     /**
@@ -67,10 +70,28 @@ public class FundService {
     }
 
     /**
+     * Uygulama basladiginda fon cache'ini doldurur.
+     *
+     * <p>Velzon API cold start nedeniyle ilk istek yavas olabilir.
+     * Startup'ta async olarak cache doldurularak kullanici beklemesi onlenir.</p>
+     */
+    @EventListener(ApplicationReadyEvent.class)
+    @Async
+    public void warmUpCache() {
+        log.info("[FUND] Startup cache warm-up basladi");
+        try {
+            List<FundDto> funds = getAllFunds();
+            log.info("[FUND] Startup cache warm-up tamamlandi: {} fon", funds.size());
+        } catch (Exception e) {
+            log.warn("[FUND] Startup cache warm-up basarisiz: {}", e.getMessage());
+        }
+    }
+
+    /**
      * Tum aktif fonlari dondurur.
      *
      * <p>api.velzon.tr'deki {@code GET /api/funds?page=0&size=2500&isActive=true}
-     * endpoint'ini cagirir. Sonuclar volatile cache ile saklanir (TTL: 120s).</p>
+     * endpoint'ini cagirir. Sonuclar volatile cache ile saklanir (TTL: 4 saat).</p>
      *
      * @return fon listesi; hata durumunda bos liste
      */
