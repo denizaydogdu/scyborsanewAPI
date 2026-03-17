@@ -78,7 +78,7 @@ public class StockLogoController {
      *
      * <p>Fintables CDN'den indirilen logo in-memory cache'lenir.
      * Browser cache: 7 gun ({@code Cache-Control: public, max-age=604800}).
-     * PNG/JPEG/SVG formatlari desteklenir. SVG dosyalarinda XSS onlemi icin
+     * PNG/JPEG/SVG/WebP formatlari desteklenir. SVG dosyalarinda XSS onlemi icin
      * {@code Content-Security-Policy} header'i eklenir.</p>
      *
      * @param filename logo dosya adi (orn. "alnus_yatirim_icon.png")
@@ -92,6 +92,7 @@ public class StockLogoController {
         }
         boolean isSvg = filename.endsWith(".svg");
         MediaType mediaType = isSvg ? MediaType.valueOf("image/svg+xml")
+                : filename.endsWith(".webp") ? MediaType.valueOf("image/webp")
                 : filename.endsWith(".png") ? MediaType.IMAGE_PNG
                 : MediaType.IMAGE_JPEG;
         // Browser cache 7 gun — UI proxy bu header'i forward etmez, browser icin UI controller'da ayri set edilir
