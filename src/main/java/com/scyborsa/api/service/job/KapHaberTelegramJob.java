@@ -2,7 +2,8 @@ package com.scyborsa.api.service.job;
 
 import com.scyborsa.api.config.TelegramConfig;
 import com.scyborsa.api.dto.kap.KapNewsItemDto;
-import com.scyborsa.api.service.kap.FintablesNewsService;
+import com.scyborsa.api.dto.kap.KapNewsResponseDto;
+import com.scyborsa.api.service.kap.KapNewsClient;
 import com.scyborsa.api.service.telegram.KapHaberTelegramBuilder;
 import com.scyborsa.api.service.telegram.TelegramClient;
 import com.scyborsa.api.utils.ProfileUtils;
@@ -42,8 +43,8 @@ public class KapHaberTelegramJob {
     /** Spring profil kontrol yardimcisi. */
     private final ProfileUtils profileUtils;
 
-    /** Fintables haber servisi (KAP haberleri kaynagi). */
-    private final FintablesNewsService fintablesNewsService;
+    /** TradingView KAP haber istemcisi (news-mediator API). */
+    private final KapNewsClient kapNewsClient;
 
     /** KAP haber Telegram mesaj olusturucu. */
     private final KapHaberTelegramBuilder builder;
@@ -54,31 +55,36 @@ public class KapHaberTelegramJob {
     /** Gonderilmis haber ID'leri (gunluk reset). */
     private final Set<String> sentNewsIds = ConcurrentHashMap.newKeySet();
 
+    /** Uygulama baslangic zamani (epoch seconds) — restart flood korumasi icin. */
+    private final long startupEpochSecond = Instant.now().getEpochSecond();
+
     /**
      * KAP haber Telegram gonderimini tetikler.
      * Her 10 dakikada bir calisir, 7/24 (hafta sonu dahil).
      */
     @Scheduled(cron = "0 0/10 * * * *", zone = "Europe/Istanbul")
     public void run() {
+        log.info("[KAP-TELEGRAM-JOB] Cron tetiklendi");
         if (!profileUtils.isProdProfile()) return;
         if (!telegramConfig.isEnabled()) return;
 
         try {
-            List<KapNewsItemDto> items = fintablesNewsService.getKapNewsItems();
+            KapNewsResponseDto response = kapNewsClient.fetchKapNews();
+            List<KapNewsItemDto> items = (response != null) ? response.getItems() : null;
             if (items == null || items.isEmpty()) {
                 log.debug("[KAP-TELEGRAM-JOB] Haber yok");
                 return;
             }
+            log.info("[KAP-TELEGRAM-JOB] {} KAP haberi alindi", items.size());
 
-            long fifteenMinAgo = Instant.now().minusSeconds(900).getEpochSecond();
             int maxPerCycle = telegramConfig.getKap().getMaxPerCycle();
 
             int sentCount = 0;
             for (KapNewsItemDto item : items) {
                 if (item.getId() == null) continue;
 
-                // Restart flood koruması: sadece son 15 dakikadaki haberleri gönder
-                if (item.getPublished() != null && item.getPublished() < fifteenMinAgo) {
+                // Restart flood koruması: uygulama başlamadan önceki haberleri atla
+                if (item.getPublished() != null && item.getPublished() < startupEpochSecond) {
                     sentNewsIds.add(item.getId());
                     continue;
                 }
@@ -100,6 +106,8 @@ public class KapHaberTelegramJob {
                         : telegramClient.sendHtmlMessage(message);
                 if (!sent) {
                     sentNewsIds.remove(item.getId());
+                } else {
+                    telegramClient.sendHtmlMessage("****************************************");
                 }
 
                 sentCount += sent ? 1 : 0;
