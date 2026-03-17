@@ -48,7 +48,7 @@ public class StockLogoService {
     private static final Pattern VALID_LOGOID = Pattern.compile("^[a-z0-9-]{1,100}$");
 
     /** Araci kurum logo dosya adi format dogrulama deseni. */
-    private static final Pattern VALID_BROKERAGE_FILENAME = Pattern.compile("^[a-z0-9_-]{1,100}\\.(png|jpeg|jpg|svg)$");
+    private static final Pattern VALID_BROKERAGE_FILENAME = Pattern.compile("^[a-z0-9_-]{1,100}\\.(png|jpeg|jpg|svg|webp)$");
 
     /** Maksimum cache boyutu (her iki logo cache icin). */
     private static final int MAX_CACHE_SIZE = 2000;
