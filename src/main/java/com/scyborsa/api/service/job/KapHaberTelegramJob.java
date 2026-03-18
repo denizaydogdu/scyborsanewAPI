@@ -3,6 +3,7 @@ package com.scyborsa.api.service.job;
 import com.scyborsa.api.config.TelegramConfig;
 import com.scyborsa.api.dto.kap.KapNewsItemDto;
 import com.scyborsa.api.dto.kap.KapNewsResponseDto;
+import com.scyborsa.api.service.kap.HaberDetailFetcher;
 import com.scyborsa.api.service.kap.KapNewsClient;
 import com.scyborsa.api.service.telegram.KapHaberTelegramBuilder;
 import com.scyborsa.api.service.telegram.TelegramClient;
@@ -49,8 +50,11 @@ public class KapHaberTelegramJob {
     /** KAP haber Telegram mesaj olusturucu. */
     private final KapHaberTelegramBuilder builder;
 
-    /** Haber detay repository (shortDescription arama icin). */
+    /** Haber detay repository. */
     private final HaberDetayRepository haberDetayRepository;
+
+    /** Haber detay fetcher (on-demand scraping). */
+    private final HaberDetailFetcher haberDetailFetcher;
 
     /** Gonderilmis haber ID'leri (gunluk reset). */
     private final Set<String> sentNewsIds = ConcurrentHashMap.newKeySet();
@@ -94,8 +98,8 @@ public class KapHaberTelegramJob {
                     continue;
                 }
 
-                String shortDesc = lookupShortDescription(item.getId());
-                String message = builder.build(item, shortDesc);
+                String detailContent = lookupDetailContent(item.getId());
+                String message = builder.build(item, detailContent);
                 if (message == null) {
                     continue;
                 }
@@ -130,17 +134,32 @@ public class KapHaberTelegramJob {
     }
 
     /**
-     * HaberDetay tablosundan kisa aciklama arar.
+     * HaberDetay tablosundan detay icerigini arar.
+     * Detay henuz cekilmemisse on-demand fetch yapar.
      *
      * @param newsId haber kimligi
-     * @return kisa aciklama veya null
+     * @return detay icerigi veya null
      */
-    private String lookupShortDescription(String newsId) {
+    private String lookupDetailContent(String newsId) {
         if (newsId == null) return null;
         try {
-            return haberDetayRepository.findByNewsId(newsId)
-                    .map(HaberDetay::getShortDescription)
-                    .orElse(null);
+            var optHaber = haberDetayRepository.findByNewsId(newsId);
+            if (optHaber.isEmpty()) return null;
+
+            HaberDetay haber = optHaber.get();
+
+            // Detay henüz çekilmemişse on-demand fetch
+            if (!haber.isFetched()) {
+                haberDetailFetcher.fetchDetailOnDemand(haber);
+                // Refresh from DB
+                haber = haberDetayRepository.findByNewsId(newsId).orElse(haber);
+            }
+
+            // detailContent varsa onu döndür, yoksa shortDescription
+            if (haber.getDetailContent() != null && !haber.getDetailContent().isBlank()) {
+                return haber.getDetailContent();
+            }
+            return haber.getShortDescription();
         } catch (Exception e) {
             log.debug("[KAP-TELEGRAM-JOB] HaberDetay lookup hatasi: {}", e.getMessage());
             return null;

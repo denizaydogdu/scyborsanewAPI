@@ -14,5 +14,8 @@ public enum EnrichmentDataTypeEnum {
     TAKAS,
 
     /** Emir Defteri (Orderbook) verisi. */
-    ORDERBOOK
+    ORDERBOOK,
+
+    /** AI teknik analiz yorumu. */
+    AI_COMMENT
 }

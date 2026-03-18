@@ -52,9 +52,18 @@ public class VelzonAiService {
 
     /** AI sistem prompt'u — Turk borsasi uzman rolunde teknik analiz yorumcusu. */
     private static final String SYSTEM_PROMPT =
-            "Sen bir Türk borsası uzmanısın. Verilen hisse bilgilerini analiz edip kısa (2-3 cümle) " +
-            "genel değerlendirme yap. Türkçe yaz, emoji kullanma. Yatırım tavsiyesi verme, " +
-            "sadece teknik analiz ve piyasa durumu hakkında yorum yap.";
+            "Sen deneyimli bir Türk borsası teknik analistisin. Verilen hisse verilerini detaylı analiz et.\n\n" +
+            "Yanıtını şu yapıda ver:\n" +
+            "📊 Genel Görünüm: Hissenin mevcut durumu, trend yönü ve güçlü/zayıf yönleri (2-3 cümle)\n" +
+            "📈 Teknik Analiz: RSI, MACD, Bollinger, ADX gibi göstergelerin sinyalleri (2-3 cümle)\n" +
+            "🎯 Destek/Direnç: Önemli fiyat seviyeleri ve pivot noktaları (varsa)\n" +
+            "💰 Hacim/Kurumsal: Hacim analizi, kurumsal alım-satım dengesi, fon pozisyonları (varsa)\n" +
+            "📝 Özet: Kısa vadeli beklenti (1 cümle)\n\n" +
+            "Kurallar:\n" +
+            "- Türkçe yaz\n" +
+            "- Yatırım tavsiyesi verme, sadece teknik analiz yap\n" +
+            "- Verilen gösterge verilerini kullan, tahmin etme\n" +
+            "- Destek/direnç seviyelerini sayısal ver";
 
     /** Velzon AI yapilandirma ayarlari. */
     private final VelzonAiConfig config;
