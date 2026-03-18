@@ -111,7 +111,11 @@ public class KapHaberTelegramJob {
                 if (!sent) {
                     sentNewsIds.remove(item.getId());
                 } else {
-                    telegramClient.sendHtmlMessage("****************************************");
+                    if (kapTopicId > 0) {
+                        telegramClient.sendHtmlMessageToTopic("****************************************", kapTopicId);
+                    } else {
+                        telegramClient.sendHtmlMessage("****************************************");
+                    }
                 }
 
                 sentCount += sent ? 1 : 0;
