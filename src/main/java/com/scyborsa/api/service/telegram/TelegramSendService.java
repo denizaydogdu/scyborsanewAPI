@@ -369,6 +369,11 @@ public class TelegramSendService {
 
         if (sent) {
             log.info("[TELEGRAM-SEND] AI yorum gonderildi: {}", stockName);
+            if (topicId > 0) {
+                telegramClient.sendHtmlMessageToTopic("****************************************", topicId);
+            } else {
+                telegramClient.sendHtmlMessage("****************************************");
+            }
         } else {
             sentAiCommentsToday.remove(stockName); // Rollback — tekrar denenebilir
             log.warn("[TELEGRAM-SEND] AI yorum gonderilemedi: {}", stockName);

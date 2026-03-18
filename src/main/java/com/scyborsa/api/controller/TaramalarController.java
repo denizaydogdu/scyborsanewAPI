@@ -40,6 +40,7 @@ public class TaramalarController {
      * @param endDate bitiş tarihi (ISO format, opsiyonel — varsayılan bugün)
      * @param screener tarama adı filtresi (contains, case-insensitive; opsiyonel)
      * @param stock hisse kodu filtresi (contains, case-insensitive; opsiyonel)
+     * @param groupByStock {@code true} ise hisse bazlı gruplama yapılır (opsiyonel, varsayılan false)
      * @return taramalar listesi, özet istatistikler, filtre dropdown ve toplam kart sayısı
      */
     @GetMapping
@@ -47,7 +48,8 @@ public class TaramalarController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
             @RequestParam(required = false) String screener,
-            @RequestParam(required = false) String stock) {
+            @RequestParam(required = false) String stock,
+            @RequestParam(required = false, defaultValue = "false") boolean groupByStock) {
 
         LocalDate today = LocalDate.now(ZoneId.of("Europe/Istanbul"));
 
@@ -76,9 +78,9 @@ public class TaramalarController {
             endDate = temp;
         }
 
-        log.info("[TARAMALAR] Taramalar sorgulandı: startDate={}, endDate={}, screener={}, stock={}",
-                startDate, endDate, screener, stock);
+        log.info("[TARAMALAR] Taramalar sorgulandı: startDate={}, endDate={}, screener={}, stock={}, groupByStock={}",
+                startDate, endDate, screener, stock, groupByStock);
 
-        return ResponseEntity.ok(taramalarService.getTaramalar(startDate, endDate, screener, stock));
+        return ResponseEntity.ok(taramalarService.getTaramalar(startDate, endDate, screener, stock, groupByStock));
     }
 }

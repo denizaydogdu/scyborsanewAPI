@@ -1,5 +1,6 @@
 package com.scyborsa.api.service;
 
+import com.scyborsa.api.dto.tarama.StockGroupDto;
 import com.scyborsa.api.dto.tarama.TaramaDto;
 import com.scyborsa.api.dto.tarama.TaramaOzetDto;
 import com.scyborsa.api.dto.tarama.TaramalarResponseDto;
@@ -10,6 +11,8 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.DoubleSummaryStatistics;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -46,12 +49,22 @@ public class TaramalarService {
      * @param endDate bitiş tarihi (dahil)
      * @param screener tarama adı filtresi (contains, case-insensitive; null ise filtre yok)
      * @param stock hisse kodu filtresi (contains, case-insensitive; null ise filtre yok)
+     * @param groupByStock {@code true} ise hisse bazlı gruplama yapılır
      * @return taramalar, özet, filtre dropdown ve toplam kart bilgisi
      */
     public TaramalarResponseDto getTaramalar(LocalDate startDate, LocalDate endDate,
-                                              String screener, String stock) {
+                                              String screener, String stock,
+                                              boolean groupByStock) {
         List<ScreenerResultModel> results = screenerResultRepository
                 .findTelegramSentBetweenDays(startDate, endDate);
+
+        // Filtre dropdown için benzersiz tarama adları (filtrelenmemiş sonuçlardan türet)
+        List<String> screenerNames = results.stream()
+                .map(ScreenerResultModel::getScreenerName)
+                .filter(Objects::nonNull)
+                .distinct()
+                .sorted()
+                .toList();
 
         // Tarama adı filtresi (contains, case-insensitive)
         if (screener != null && !screener.isBlank()) {
@@ -77,19 +90,18 @@ public class TaramalarService {
         // Özet istatistikler
         TaramaOzetDto ozet = buildOzet(results);
 
-        // Filtre dropdown için benzersiz tarama adları (filtrelenmiş sonuçlardan türet)
-        List<String> screenerNames = results.stream()
-                .map(ScreenerResultModel::getScreenerName)
-                .filter(Objects::nonNull)
-                .distinct()
-                .sorted()
-                .toList();
+        // Hisse bazlı gruplama (groupByStock=true ise)
+        List<StockGroupDto> stockGroups = null;
+        if (groupByStock) {
+            stockGroups = buildStockGroups(results);
+        }
 
         return TaramalarResponseDto.builder()
                 .taramalar(taramalar)
                 .ozet(ozet)
                 .screenerNames(screenerNames)
                 .toplamKart(taramalar.size())
+                .stockGroups(stockGroups)
                 .build();
     }
 
@@ -146,6 +158,58 @@ public class TaramalarService {
                 .gunSonuDegisim(model.getGunSonuDegisim())
                 .grouped(isGrouped)
                 .build();
+    }
+
+    /**
+     * Tarama sonuçlarını stockName bazında gruplar ve StockGroupDto listesine dönüştürür.
+     *
+     * <p>Her hisse için sinyal sayısı, ilk/son fiyat ve gün sonu değişim hesaplanır.
+     * Sinyaller zaman sırasına göre sıralanır. Gruplar sinyal sayısına göre azalan sıralanır.</p>
+     *
+     * @param results entity listesi
+     * @return hisse bazlı gruplu DTO listesi
+     */
+    private List<StockGroupDto> buildStockGroups(List<ScreenerResultModel> results) {
+        // stockName bazında grupla (sıra korunsun)
+        Map<String, List<ScreenerResultModel>> grouped = results.stream()
+                .filter(r -> r.getStockName() != null)
+                .collect(Collectors.groupingBy(
+                        ScreenerResultModel::getStockName,
+                        LinkedHashMap::new,
+                        Collectors.toList()));
+
+        List<StockGroupDto> stockGroups = new ArrayList<>();
+
+        for (Map.Entry<String, List<ScreenerResultModel>> entry : grouped.entrySet()) {
+            List<ScreenerResultModel> group = entry.getValue();
+
+            // Zaman sırasına göre sırala (gün + saat)
+            group.sort(Comparator
+                    .comparing((ScreenerResultModel r) -> r.getScreenerDay() != null ? r.getScreenerDay() : LocalDate.MIN)
+                    .thenComparing(r -> r.getScreenerTime() != null ? r.getScreenerTime() : java.time.LocalTime.MIN));
+
+            ScreenerResultModel first = group.get(0);
+            ScreenerResultModel last = group.get(group.size() - 1);
+
+            // Her sinyal için bireysel DTO oluştur (gruplama YAPMA)
+            List<TaramaDto> sinyaller = group.stream()
+                    .map(r -> toDto(r, false, r.getScreenerName()))
+                    .toList();
+
+            stockGroups.add(StockGroupDto.builder()
+                    .stockName(entry.getKey())
+                    .sinyalSayisi(group.size())
+                    .ilkFiyat(first.getPrice())
+                    .sonFiyat(last.getPrice())
+                    .gunSonuDegisim(last.getGunSonuDegisim())
+                    .sinyaller(sinyaller)
+                    .build());
+        }
+
+        // Sinyal sayısına göre azalan sırala
+        stockGroups.sort(Comparator.comparingInt(StockGroupDto::getSinyalSayisi).reversed());
+
+        return stockGroups;
     }
 
     /**

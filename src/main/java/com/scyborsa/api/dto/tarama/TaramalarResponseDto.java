@@ -30,4 +30,7 @@ public class TaramalarResponseDto {
 
     /** Görüntülenen kart sayısı (gruplama sonrası). Ham sinyal sayısı için {@link TaramaOzetDto#toplamSinyal} kullanılmalı. */
     private int toplamKart;
+
+    /** Hisse bazli gruplanmis sinyal listesi. {@code groupByStock=true} ise dolu, degilse {@code null}. */
+    private List<StockGroupDto> stockGroups;
 }
