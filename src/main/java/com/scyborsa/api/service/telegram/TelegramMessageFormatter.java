@@ -73,6 +73,10 @@ public class TelegramMessageFormatter {
     @Autowired(required = false)
     private TakasApiService takasApiService;
 
+    /** Emir defteri (orderbook) servisi (opsiyonel). */
+    @Autowired(required = false)
+    private OrderbookService orderbookService;
+
     /** Telegram bot yapilandirma bilgileri. */
     @Autowired
     private TelegramConfig telegramConfig;
@@ -143,6 +147,7 @@ public class TelegramMessageFormatter {
         sb.append(buildModelPortfolioSection(stockName));
         sb.append(buildKurumDagilimiSection(stockName));
         sb.append(buildTakasDagilimiSection(stockName));
+        sb.append(buildDerinlikSection(stockName));
 
         // TP/SL devre dışı — T017 ile aktif edilebilir
         // if (tp != null && tp > 0) {
@@ -213,6 +218,7 @@ public class TelegramMessageFormatter {
         sb.append(buildModelPortfolioSection(stockName));
         sb.append(buildKurumDagilimiSection(stockName));
         sb.append(buildTakasDagilimiSection(stockName));
+        sb.append(buildDerinlikSection(stockName));
 
         // TP/SL devre dışı — T017 ile aktif edilebilir
         // if (tp != null && tp > 0) {
@@ -475,6 +481,72 @@ public class TelegramMessageFormatter {
             log.debug("[FORMATTER] Takas dagitimi atlandi ({}): {}", stockName, e.getMessage());
             return "";
         }
+    }
+
+    /**
+     * Emir defteri (derinlik) section'i olusturur.
+     *
+     * <p>OrderbookService uzerinden son islemleri ceker,
+     * alis (B) ve satis (S) islemlerini ayri ayri listeler.</p>
+     *
+     * @param stockName hisse kodu (ornegin "THYAO")
+     * @return HTML formatinda emir defteri section'i; veri yoksa bos string
+     */
+    private String buildDerinlikSection(String stockName) {
+        if (orderbookService == null) return "";
+        try {
+            OrderbookResponseDto data = orderbookService.getOrderbookTransactions(stockName);
+            if (data == null || data.getTransactions() == null || data.getTransactions().isEmpty()) return "";
+
+            List<OrderbookResponseDto.OrderbookTransactionDto> alislar = data.getTransactions().stream()
+                    .filter(t -> "B".equals(t.getAction()))
+                    .limit(5).toList();
+
+            List<OrderbookResponseDto.OrderbookTransactionDto> satislar = data.getTransactions().stream()
+                    .filter(t -> "S".equals(t.getAction()))
+                    .limit(5).toList();
+
+            if (alislar.isEmpty() && satislar.isEmpty()) return "";
+
+            StringBuilder sb = new StringBuilder();
+            sb.append("📒 <b>EMİR DEFTERİ:</b>\n");
+
+            for (var t : alislar) {
+                sb.append("  🟢 <code>").append(t.getTime()).append("</code> | ")
+                  .append(escapeHtml(String.format("%.2f₺", t.getPrice()))).append(" × ")
+                  .append(formatDerinlikLot(t.getLot())).append(" lot | ")
+                  .append(escapeHtml(t.getBuyerShortTitle())).append(" → ")
+                  .append(escapeHtml(t.getSellerShortTitle())).append("\n");
+            }
+
+            for (var t : satislar) {
+                sb.append("  🔴 <code>").append(t.getTime()).append("</code> | ")
+                  .append(escapeHtml(String.format("%.2f₺", t.getPrice()))).append(" × ")
+                  .append(formatDerinlikLot(t.getLot())).append(" lot | ")
+                  .append(escapeHtml(t.getSellerShortTitle())).append(" → ")
+                  .append(escapeHtml(t.getBuyerShortTitle())).append("\n");
+            }
+            sb.append("\n");
+
+            return sb.toString();
+        } catch (Exception e) {
+            log.debug("[FORMATTER] Derinlik bilgisi atlandı ({}): {}", stockName, e.getMessage());
+            return "";
+        }
+    }
+
+    /**
+     * Lot miktarini okunabilir formata donusturur.
+     *
+     * <p>1.000.000+ icin M, 1.000+ icin K suffix'i ekler.</p>
+     *
+     * @param lot lot miktari
+     * @return formatlanmis lot string'i (ornegin "4.9M", "150K", "500")
+     */
+    private String formatDerinlikLot(int lot) {
+        if (lot >= 1_000_000) return String.format("%.1fM", lot / 1_000_000.0);
+        if (lot >= 1_000) return String.format("%.1fK", lot / 1_000.0);
+        return String.valueOf(lot);
     }
 
     // ==================== UTILITY ====================
