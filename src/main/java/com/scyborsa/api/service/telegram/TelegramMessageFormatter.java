@@ -47,6 +47,9 @@ public class TelegramMessageFormatter {
     private static final DateTimeFormatter DATETIME_FORMATTER =
             DateTimeFormatter.ofPattern("HH:mm:ss - dd MMMM yyyy", TURKISH_LOCALE);
 
+    /** Telegram mesaj karakter limiti (4096 — 200 karakter güvenlik payı). */
+    private static final int TELEGRAM_MSG_SAFE_LIMIT = 3900;
+
     // ==================== OPTIONAL ENRICHMENT SERVICES ====================
 
     /** Kurumsal guc skoru hesaplama servisi (opsiyonel). */
@@ -147,17 +150,15 @@ public class TelegramMessageFormatter {
         sb.append(buildModelPortfolioSection(stockName));
         sb.append(buildKurumDagilimiSection(stockName));
         sb.append(buildTakasDagilimiSection(stockName));
-        sb.append(buildDerinlikSection(stockName));
 
-        // TP/SL devre dışı — T017 ile aktif edilebilir
-        // if (tp != null && tp > 0) {
-        //     double tpPct = price != null && price > 0 ? ((tp - price) / price) * 100 : 0;
-        //     sb.append(String.format("🎯 <b>TP:</b> <code>%.2f ₺</code> (%+.1f%%)\n", tp, tpPct));
-        // }
-        // if (sl != null && sl > 0) {
-        //     double slPct = price != null && price > 0 ? ((sl - price) / price) * 100 : 0;
-        //     sb.append(String.format("🛑 <b>SL:</b> <code>%.2f ₺</code> (%.1f%%)\n", sl, slPct));
-        // }
+        // Emir defteri — sadece karakter limiti yeterliyse ekle
+        if (sb.length() < TELEGRAM_MSG_SAFE_LIMIT) {
+            String derinlik = buildDerinlikSection(stockName);
+            if (sb.length() + derinlik.length() < TELEGRAM_MSG_SAFE_LIMIT) {
+                sb.append(derinlik);
+            }
+        }
+
         sb.append("\n");
 
         // Tarama bilgisi
@@ -218,17 +219,15 @@ public class TelegramMessageFormatter {
         sb.append(buildModelPortfolioSection(stockName));
         sb.append(buildKurumDagilimiSection(stockName));
         sb.append(buildTakasDagilimiSection(stockName));
-        sb.append(buildDerinlikSection(stockName));
 
-        // TP/SL devre dışı — T017 ile aktif edilebilir
-        // if (tp != null && tp > 0) {
-        //     double tpPct = price != null && price > 0 ? ((tp - price) / price) * 100 : 0;
-        //     sb.append(String.format("🎯 <b>TP:</b> <code>%.2f ₺</code> (%+.1f%%)\n", tp, tpPct));
-        // }
-        // if (sl != null && sl > 0) {
-        //     double slPct = price != null && price > 0 ? ((sl - price) / price) * 100 : 0;
-        //     sb.append(String.format("🛑 <b>SL:</b> <code>%.2f ₺</code> (%.1f%%)\n", sl, slPct));
-        // }
+        // Emir defteri — sadece karakter limiti yeterliyse ekle
+        if (sb.length() < TELEGRAM_MSG_SAFE_LIMIT) {
+            String derinlik = buildDerinlikSection(stockName);
+            if (sb.length() + derinlik.length() < TELEGRAM_MSG_SAFE_LIMIT) {
+                sb.append(derinlik);
+            }
+        }
+
         sb.append("\n");
 
         sb.append("📋 <b>1 tarama</b>\n");
@@ -500,11 +499,11 @@ public class TelegramMessageFormatter {
 
             List<OrderbookResponseDto.OrderbookTransactionDto> alislar = data.getTransactions().stream()
                     .filter(t -> "B".equals(t.getAction()))
-                    .limit(5).toList();
+                    .limit(3).toList();
 
             List<OrderbookResponseDto.OrderbookTransactionDto> satislar = data.getTransactions().stream()
                     .filter(t -> "S".equals(t.getAction()))
-                    .limit(5).toList();
+                    .limit(3).toList();
 
             if (alislar.isEmpty() && satislar.isEmpty()) return "";
 
