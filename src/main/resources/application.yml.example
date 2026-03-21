@@ -133,6 +133,14 @@ telegram:
   chart-base-url: "https://www.tradingview.com/chart/?symbol=BIST:"
   send-rate-limit-ms: 200
 
+# Django API (velzon-django formasyon tarama)
+django:
+  api:
+    base-url: ${DJANGO_API_URL:http://209.38.247.159:8001}
+    api-key: ${DJANGO_API_KEY:CHANGE_ME}
+    connect-timeout-seconds: 10
+    request-timeout-seconds: 30
+
 haber:
   sync:
     enabled: true

@@ -128,26 +128,42 @@ public class SectorService {
         }
 
         // Her hisseyi sektorlere esle
-        Map<String, List<Double>> sectorChanges = new HashMap<>();
+        Map<String, List<RawStockData>> sectorStocks = new HashMap<>();
 
         for (RawStockData stock : allStocks) {
             List<SectorDefinitionDto> matchedSectors = registry.matchStock(
                     stock.tvSector, stock.tvIndustry, stock.ticker);
 
             for (SectorDefinitionDto sector : matchedSectors) {
-                sectorChanges.computeIfAbsent(sector.getSlug(), k -> new ArrayList<>())
-                        .add(stock.changePercent);
+                sectorStocks.computeIfAbsent(sector.getSlug(), k -> new ArrayList<>())
+                        .add(stock);
             }
         }
 
         // Ozet DTO'lari olustur
         List<SectorSummaryDto> summaries = new ArrayList<>();
         for (SectorDefinitionDto def : registry.getAll()) {
-            List<Double> changes = sectorChanges.get(def.getSlug());
-            int stockCount = changes != null ? changes.size() : 0;
+            List<RawStockData> stocks = sectorStocks.get(def.getSlug());
+            int stockCount = stocks != null ? stocks.size() : 0;
             double avgChange = 0.0;
-            if (changes != null && !changes.isEmpty()) {
-                avgChange = changes.stream().mapToDouble(Double::doubleValue).average().orElse(0.0);
+            List<SectorSummaryDto.TopStockInfo> topStocks = List.of();
+
+            if (stocks != null && !stocks.isEmpty()) {
+                avgChange = stocks.stream().mapToDouble(RawStockData::changePercent).average().orElse(0.0);
+
+                // Top 3 hisse: |changePercent| en yuksek, changePercent DESC sirali
+                topStocks = stocks.stream()
+                        .sorted(Comparator.comparingDouble((RawStockData s) -> Math.abs(s.changePercent())).reversed())
+                        .limit(3)
+                        .map(s -> SectorSummaryDto.TopStockInfo.builder()
+                                .ticker(s.ticker())
+                                .description(s.description())
+                                .price(s.price())
+                                .changePercent(Math.round(s.changePercent() * 100.0) / 100.0)
+                                .volume(s.volume())
+                                .logoid(s.logoid())
+                                .build())
+                        .toList();
             }
 
             summaries.add(SectorSummaryDto.builder()
@@ -157,6 +173,7 @@ public class SectorService {
                     .icon(def.getIcon())
                     .stockCount(stockCount)
                     .avgChangePercent(Math.round(avgChange * 100.0) / 100.0)
+                    .topStocks(topStocks)
                     .build());
         }
 
@@ -491,9 +508,25 @@ public class SectorService {
                 JsonNode dArray = item.get("d");
                 if (dArray == null || !dArray.isArray()) continue;
 
+                // d[1] = description
+                String description = dArray.size() > 1 && !dArray.get(1).isNull()
+                        ? dArray.get(1).asText() : "";
+
+                // d[3] = close (price)
+                double price = dArray.size() > 3 && dArray.get(3).isNumber()
+                        ? dArray.get(3).asDouble() : 0.0;
+
                 // d[4] = change (changePercent)
                 double changePercent = dArray.size() > 4 && dArray.get(4).isNumber()
                         ? dArray.get(4).asDouble() : 0.0;
+
+                // d[5] = volume
+                double volume = dArray.size() > 5 && dArray.get(5).isNumber()
+                        ? dArray.get(5).asDouble() : 0.0;
+
+                // d[2] = logoid
+                String logoid = dArray.size() > 2 && !dArray.get(2).isNull()
+                        ? dArray.get(2).asText() : null;
 
                 // d[6] = sector
                 String tvSector = dArray.size() > 6 && !dArray.get(6).isNull()
@@ -503,7 +536,8 @@ public class SectorService {
                 String tvIndustry = dArray.size() > 7 && !dArray.get(7).isNull()
                         ? dArray.get(7).asText() : null;
 
-                result.add(new RawStockData(ticker, changePercent, tvSector, tvIndustry));
+                result.add(new RawStockData(ticker, description, price, changePercent,
+                        volume, logoid, tvSector, tvIndustry));
             }
         } catch (Exception e) {
             log.error("[SECTOR-SERVICE] Summary response parse hatasi", e);
@@ -514,14 +548,20 @@ public class SectorService {
     /**
      * Tum hisse taramasi sonuclarini gecici olarak tutan ic sinif.
      *
-     * <p>Yalnizca sektor esleme ve ozet hesaplama icin kullanilir,
+     * <p>Yalnizca sektor esleme, ozet hesaplama ve top hisse secimi icin kullanilir,
      * dis dunyaya expose edilmez.</p>
      *
      * @param ticker        hisse borsa kodu
+     * @param description   hisse aciklamasi
+     * @param price         son fiyat
      * @param changePercent gunluk degisim yuzdesi
+     * @param volume        islem hacmi
+     * @param logoid        logo id
      * @param tvSector      TradingView sector degeri
      * @param tvIndustry    TradingView industry degeri
      */
-    private record RawStockData(String ticker, double changePercent, String tvSector, String tvIndustry) {
+    private record RawStockData(String ticker, String description, double price,
+                                double changePercent, double volume, String logoid,
+                                String tvSector, String tvIndustry) {
     }
 }

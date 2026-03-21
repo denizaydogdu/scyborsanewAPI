@@ -5,11 +5,14 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.List;
+
 /**
  * Sektor ozet DTO'su.
  *
  * <p>Sektor listeleme sayfasi icin kullanilir. Her sektor icin
- * hisse sayisi ve ortalama degisim yuzdesi bilgisini tasir.</p>
+ * hisse sayisi, ortalama degisim yuzdesi ve en onemli hisselerin
+ * detay bilgisini tasir.</p>
  *
  * @see com.scyborsa.api.service.SectorService
  * @see com.scyborsa.api.controller.SectorController
@@ -37,4 +40,38 @@ public class SectorSummaryDto {
 
     /** Sektordeki hisselerin ortalama degisim yuzdesi. */
     private double avgChangePercent;
+
+    /** Sektordeki en yuksek degisime sahip top 3 hisse. */
+    private List<TopStockInfo> topStocks;
+
+    /**
+     * Sektor icindeki bireysel hisse ozet bilgisi.
+     *
+     * <p>Dashboard sektor kartlarinda sektordeki en onemli hisselerin
+     * fiyat, degisim ve hacim bilgilerini gostermek icin kullanilir.</p>
+     */
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class TopStockInfo {
+
+        /** Hisse borsa kodu (orn. "ANHYT"). */
+        private String ticker;
+
+        /** Hisse aciklamasi (orn. "Anadolu Hayat Emeklilik"). */
+        private String description;
+
+        /** Son fiyat (orn. 124.10). */
+        private double price;
+
+        /** Gunluk degisim yuzdesi (orn. 5.08). */
+        private double changePercent;
+
+        /** Islem hacmi (orn. 2350000). */
+        private double volume;
+
+        /** Logo proxy icin logoid. */
+        private String logoid;
+    }
 }
