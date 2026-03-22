@@ -38,7 +38,9 @@ public class PatternScreenerService {
     private final VelzonApiClient velzonApiClient;
 
     private static final String PATTERN_SCREENER_PATH = "/ajax/pattern-screener-data/";
+    private static final String INDICATOR_SCREENER_PATH = "/screener/ajax/indicator-screener/?timeframe=1d";
     private static final String SCREENER_PATH = "/api/screener/ALL_STOCKS_WITH_INDICATORS";
+    private static final Set<Integer> EXTRA_PATTERN_TYPES = Set.of(10, 11, 12);
 
     /** Cache'lenmiş formasyon listesi. */
     private volatile List<PatternFormationDto> cachedPatterns;
@@ -46,6 +48,8 @@ public class PatternScreenerService {
     private volatile long cacheTimestamp;
     /** Cache yenileme icin kilit nesnesi. */
     private final Object cacheLock = new Object();
+    /** Logoid cache yenileme icin kilit nesnesi. */
+    private final Object logoidLock = new Object();
 
     /** StockCode → logoid esleme cache'i. */
     private volatile Map<String, String> logoidCache = Map.of();
@@ -83,13 +87,24 @@ public class PatternScreenerService {
             return List.of();
         }
 
-        // Logoid zenginlestirme
+        // Logoid zenginlestirme (defensive copy — cache'deki DTO'lari mutate etme)
         Map<String, String> logoidMap = logoidCache;
-        if (!logoidMap.isEmpty()) {
-            patterns.forEach(p -> p.setLogoid(logoidMap.get(p.getSymbol())));
+        List<PatternFormationDto> result = new ArrayList<>(patterns.size());
+        for (PatternFormationDto p : patterns) {
+            PatternFormationDto copy = PatternFormationDto.builder()
+                    .symbol(p.getSymbol())
+                    .patternName(p.getPatternName())
+                    .score(p.getScore())
+                    .distance(p.getDistance())
+                    .window(p.getWindow())
+                    .period(p.getPeriod())
+                    .filename(p.getFilename())
+                    .logoid(!logoidMap.isEmpty() ? logoidMap.get(p.getSymbol()) : p.getLogoid())
+                    .build();
+            result.add(copy);
         }
 
-        return patterns;
+        return result;
     }
 
     /**
@@ -102,6 +117,13 @@ public class PatternScreenerService {
         if (!logoidCache.isEmpty() && (now - logoidCacheTimestamp) < 21_600_000L) {
             return;
         }
+
+        synchronized (logoidLock) {
+            // Double-check locking
+            now = System.currentTimeMillis();
+            if (!logoidCache.isEmpty() && (now - logoidCacheTimestamp) < 21_600_000L) {
+                return;
+            }
 
         try {
             String responseBody = velzonApiClient.get(SCREENER_PATH);
@@ -143,6 +165,7 @@ public class PatternScreenerService {
         } catch (Exception e) {
             log.warn("[PATTERN-SCREENER] Logoid cache yenileme basarisiz", e);
         }
+        } // synchronized (logoidLock)
     }
 
     /**
@@ -165,9 +188,15 @@ public class PatternScreenerService {
             }
 
             log.info("[PATTERN-SCREENER] Cache yenileniyor (TTL: {}ms)", ttl);
-            List<PatternFormationDto> freshData = fetchFromDjango();
+            List<PatternFormationDto> freshData = new ArrayList<>(fetchFromDjango());
+            // Eksik formasyonlari indicator screener'dan ekle (type 10/11/12)
+            freshData.addAll(fetchFromIndicatorScreener());
+            // Score'a gore azalan siralama (null score'lar sona)
+            freshData.sort(Comparator.comparing(
+                    PatternFormationDto::getScore,
+                    Comparator.nullsLast(Comparator.reverseOrder())));
 
-            if (freshData != null && !freshData.isEmpty()) {
+            if (!freshData.isEmpty()) {
                 this.cachedPatterns = Collections.unmodifiableList(freshData);
                 this.cacheTimestamp = System.currentTimeMillis();
                 log.info("[PATTERN-SCREENER] Cache guncellendi: {} formasyon", freshData.size());
@@ -204,6 +233,71 @@ public class PatternScreenerService {
             return parseResponse(response.body());
         } catch (Exception e) {
             log.error("[PATTERN-SCREENER] Django API cagrisi basarisiz", e);
+            return List.of();
+        }
+    }
+
+    /**
+     * Django indicator screener API'sinden eksik grafik formasyonlarini ceker.
+     * Sadece type 10 (Ikili Tepe), 11 (Ikili Dip), 12 (Fincan Kulp) filtrelenir.
+     *
+     * @return eksik formasyon listesi; hata durumunda bos liste
+     */
+    private List<PatternFormationDto> fetchFromIndicatorScreener() {
+        try {
+            String url = djangoConfig.getBaseUrl() + INDICATOR_SCREENER_PATH;
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(url))
+                    .timeout(Duration.ofSeconds(djangoConfig.getRequestTimeoutSeconds()))
+                    .header("Accept", "application/json")
+                    .header("X-Requested-With", "XMLHttpRequest")
+                    .header("X-API-KEY", djangoConfig.getApiKey())
+                    .GET()
+                    .build();
+
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+
+            if (response.statusCode() != 200) {
+                log.warn("[PATTERN-SCREENER] Indicator screener API hatasi: status={}", response.statusCode());
+                return List.of();
+            }
+
+            JsonNode root = objectMapper.readTree(response.body());
+            JsonNode data = root.get("data");
+            if (data == null) return List.of();
+
+            JsonNode stocksData = data.get("stocks_data");
+            if (stocksData == null || !stocksData.isArray()) return List.of();
+
+            List<PatternFormationDto> patterns = new ArrayList<>();
+            for (JsonNode stock : stocksData) {
+                JsonNode pattern = stock.get("pattern");
+                if (pattern == null || pattern.isNull() || !pattern.has("type")) continue;
+
+                int type = pattern.get("type").asInt(0);
+                if (!EXTRA_PATTERN_TYPES.contains(type)) continue;
+
+                String symbol = stock.has("symbol") ? stock.get("symbol").asText("") : "";
+                String name = pattern.has("name") ? pattern.get("name").asText("") : "";
+
+                if (symbol.isEmpty() || name.isEmpty()) continue;
+
+                PatternFormationDto dto = PatternFormationDto.builder()
+                        .symbol(symbol)
+                        .patternName(name)
+                        .score(null)
+                        .distance(null)
+                        .window(null)
+                        .period("1D")
+                        .filename(null)
+                        .build();
+                patterns.add(dto);
+            }
+
+            log.info("[PATTERN-SCREENER] Indicator screener: {} ekstra formasyon (type 10/11/12)", patterns.size());
+            return patterns;
+        } catch (Exception e) {
+            log.warn("[PATTERN-SCREENER] Indicator screener cagrisi basarisiz", e);
             return List.of();
         }
     }
@@ -246,9 +340,7 @@ public class PatternScreenerService {
                 patterns.add(dto);
             }
 
-            // Score'a gore azalan siralama
-            patterns.sort(Comparator.comparingDouble((PatternFormationDto p) ->
-                    p.getScore() != null ? p.getScore() : 0.0).reversed());
+            // Siralama refreshCacheIfStale'de merge sort ile yapilir
 
             return patterns;
         } catch (Exception e) {
