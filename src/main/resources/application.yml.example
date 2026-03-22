@@ -133,6 +133,14 @@ telegram:
   chart-base-url: "https://www.tradingview.com/chart/?symbol=BIST:"
   send-rate-limit-ms: 200
 
+# Gate Velzon API (bilanco, rasyo, finansal rapor)
+gate:
+  velzon:
+    base-url: ${GATE_VELZON_URL:https://gate.velzon.tr}
+    api-key: ${GATE_VELZON_API_KEY:CHANGE_ME}
+    connect-timeout-seconds: 10
+    request-timeout-seconds: 30
+
 # Django API (velzon-django formasyon tarama)
 django:
   api:
