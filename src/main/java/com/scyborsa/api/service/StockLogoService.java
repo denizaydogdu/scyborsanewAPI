@@ -1,18 +1,31 @@
 package com.scyborsa.api.service;
 
+import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.time.Duration;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
 
 /**
- * Hisse ve araci kurum logolarini CDN'lerden indirip in-memory cache'leyen servis.
+ * Hisse ve araci kurum logolarini CDN'lerden indirip iki katmanli cache ile saklayan servis.
+ *
+ * <p>Uc katmanli logo erisim stratejisi:</p>
+ * <ol>
+ *   <li><b>In-memory cache:</b> {@link ConcurrentHashMap} (en hizli, API restart'ta kaybolur)</li>
+ *   <li><b>Disk cache:</b> Dosya sistemi ({@code logo.cache.dir}, API restart'ta korunur)</li>
+ *   <li><b>CDN:</b> TradingView / Fintables (en yavas, network bagimliligi)</li>
+ * </ol>
  *
  * <p>Iki farkli logo kaynagi desteklenir:</p>
  * <ul>
@@ -20,7 +33,7 @@ import java.util.regex.Pattern;
  *   <li><b>Araci kurum logolari:</b> Fintables CDN (PNG/JPEG format)</li>
  * </ul>
  *
- * <p>Ilk istekte CDN'den indirir, sonraki isteklerde {@link ConcurrentHashMap} cache'ten
+ * <p>Ilk istekte CDN'den indirir, sonraki isteklerde in-memory veya disk cache'ten
  * servis eder. CDN'de bulunamayan logolar icin {@code EMPTY} sentinel doner.
  * EMPTY sentinel'ler 1 saat sonra expire olur (gecici CDN hatalarinda kalici cache poisoning onlenir).
  * CDN'den gelen yanit boyutu 512KB sinirini asarsa reddedilir.</p>
@@ -59,6 +72,12 @@ public class StockLogoService {
     /** CDN yanit body maksimum boyutu (512KB). Beklenmedik buyuk yanitlari reddeder. */
     private static final int MAX_RESPONSE_SIZE = 512_000;
 
+    /** Disk cache alt dizini: hisse logolari. */
+    private static final String STOCK_SUBDIR = "stock";
+
+    /** Disk cache alt dizini: araci kurum logolari. */
+    private static final String BROKERAGE_SUBDIR = "brokerage";
+
     /** Hisse logo cache: logoid -> SVG byte dizisi. */
     private final ConcurrentHashMap<String, byte[]> stockLogoCache = new ConcurrentHashMap<>();
 
@@ -68,6 +87,10 @@ public class StockLogoService {
     private final ConcurrentHashMap<String, Long> negativeCacheTimestamps = new ConcurrentHashMap<>();
     /** HTTP istekleri icin Java 11 HttpClient. */
     private final HttpClient httpClient;
+
+    /** Disk cache ana dizini. Yapilandirma: {@code logo.cache.dir} property. */
+    @Value("${logo.cache.dir:./cache/logos}")
+    private String cacheDir;
 
     /**
      * StockLogoService constructor.
@@ -80,9 +103,27 @@ public class StockLogoService {
     }
 
     /**
-     * Logoid'e ait SVG hisse logo verisini dondurur (cache-first).
+     * Disk cache dizinlerini olusturur.
      *
-     * <p>Ilk istekte TradingView CDN'den indirir, sonraki isteklerde cache'ten servis eder.
+     * <p>Uygulama baslatildiginda {@code {cacheDir}/stock} ve {@code {cacheDir}/brokerage}
+     * alt dizinlerini olusturur. Dizin olusturulamazsa uyari loglar, uygulama calismaya devam eder.</p>
+     */
+    @PostConstruct
+    public void init() {
+        try {
+            Files.createDirectories(Path.of(cacheDir, STOCK_SUBDIR));
+            Files.createDirectories(Path.of(cacheDir, BROKERAGE_SUBDIR));
+            log.info("[LOGO] Disk cache dizini: {}", cacheDir);
+        } catch (IOException e) {
+            log.warn("[LOGO] Disk cache dizini olusturulamadi: {}", cacheDir, e);
+        }
+    }
+
+    /**
+     * Logoid'e ait SVG hisse logo verisini dondurur (in-memory -> disk -> CDN).
+     *
+     * <p>Oncelik sirasi: in-memory cache, disk cache, CDN indirme.
+     * CDN'den basariyla indirilen logolar hem diske hem in-memory cache'e yazilir.
      * CDN'de bulunamazsa {@code EMPTY} sentinel doner. EMPTY sentinel'ler
      * {@value #NEGATIVE_CACHE_TTL_MS}ms sonra expire olur ve yeniden denenir.</p>
      *
@@ -103,6 +144,14 @@ public class StockLogoService {
         if (cached != null) {
             return cached;
         }
+
+        // Disk cache kontrolu
+        byte[] diskData = readFromDisk(STOCK_SUBDIR, logoid + ".svg");
+        if (diskData != null) {
+            stockLogoCache.put(logoid, diskData);
+            return diskData;
+        }
+
         if (stockLogoCache.size() >= MAX_CACHE_SIZE) {
             return EMPTY;
         }
@@ -110,9 +159,10 @@ public class StockLogoService {
     }
 
     /**
-     * Araci kurum logo dosyasini dondurur (cache-first).
+     * Araci kurum logo dosyasini dondurur (in-memory -> disk -> CDN).
      *
-     * <p>Ilk istekte Fintables CDN'den indirir, sonraki isteklerde cache'ten servis eder.
+     * <p>Oncelik sirasi: in-memory cache, disk cache, CDN indirme.
+     * CDN'den basariyla indirilen logolar hem diske hem in-memory cache'e yazilir.
      * PNG/JPEG/SVG formatinda dosyalar desteklenir. EMPTY sentinel'ler
      * {@value #NEGATIVE_CACHE_TTL_MS}ms sonra expire olur ve yeniden denenir.</p>
      *
@@ -133,6 +183,14 @@ public class StockLogoService {
         if (cached != null) {
             return cached;
         }
+
+        // Disk cache kontrolu
+        byte[] diskData = readFromDisk(BROKERAGE_SUBDIR, filename);
+        if (diskData != null) {
+            brokerageLogoCache.put(filename, diskData);
+            return diskData;
+        }
+
         if (brokerageLogoCache.size() >= MAX_CACHE_SIZE) {
             return EMPTY;
         }
@@ -146,7 +204,11 @@ public class StockLogoService {
      * @return SVG byte dizisi veya EMPTY sentinel (hata/404 durumunda)
      */
     private byte[] fetchStockLogo(String logoid) {
-        return fetchFromUrl(STOCK_CDN_BASE + logoid + STOCK_CDN_SUFFIX, "STOCK-LOGO", logoid);
+        byte[] data = fetchFromUrl(STOCK_CDN_BASE + logoid + STOCK_CDN_SUFFIX, "STOCK-LOGO", logoid);
+        if (data != null && data.length > 0 && data != EMPTY) {
+            writeToDisk(STOCK_SUBDIR, logoid + ".svg", data);
+        }
+        return data;
     }
 
     /**
@@ -156,7 +218,11 @@ public class StockLogoService {
      * @return logo byte dizisi veya EMPTY sentinel (hata/404 durumunda)
      */
     private byte[] fetchBrokerageLogo(String filename) {
-        return fetchFromUrl(BROKERAGE_CDN_BASE + filename, "BROKERAGE-LOGO", filename);
+        byte[] data = fetchFromUrl(BROKERAGE_CDN_BASE + filename, "BROKERAGE-LOGO", filename);
+        if (data != null && data.length > 0 && data != EMPTY) {
+            writeToDisk(BROKERAGE_SUBDIR, filename, data);
+        }
+        return data;
     }
 
     /**
@@ -199,6 +265,57 @@ public class StockLogoService {
             log.warn("[{}] CDN fetch hatasi: {} - {}", logTag, key, e.getMessage());
             recordNegativeCache(key);
             return EMPTY;
+        }
+    }
+
+    /**
+     * Disk cache'ten logo dosyasi okur.
+     *
+     * @param subDir alt dizin adi ("stock" veya "brokerage")
+     * @param filename dosya adi (orn. "turk-hava-yollari.svg")
+     * @return logo byte dizisi veya {@code null} (dosya bulunamazsa veya okuma hatasi)
+     */
+    private byte[] readFromDisk(String subDir, String filename) {
+        try {
+            Path path = Path.of(cacheDir, subDir, filename);
+            if (Files.exists(path)) {
+                byte[] data = Files.readAllBytes(path);
+                if (data.length > 0) {
+                    log.debug("[LOGO] Disk cache'ten okundu: {}/{}", subDir, filename);
+                    return data;
+                }
+            }
+        } catch (IOException e) {
+            log.debug("[LOGO] Disk okuma hatasi: {}/{}", subDir, filename);
+        }
+        return null;
+    }
+
+    /**
+     * Logo verisini disk cache'e atomik olarak yazar.
+     *
+     * <p>Once gecici dosyaya ({@code .tmp} uzantili) yazar, sonra atomik {@code move}
+     * ile hedef dosyaya tasir. Atomik move desteklenmezse (cross-filesystem),
+     * standart {@code REPLACE_EXISTING} ile fallback yapar.</p>
+     *
+     * @param subDir alt dizin adi ("stock" veya "brokerage")
+     * @param filename dosya adi (orn. "turk-hava-yollari.svg")
+     * @param data yazilacak logo byte dizisi
+     */
+    private void writeToDisk(String subDir, String filename, byte[] data) {
+        try {
+            Path dir = Path.of(cacheDir, subDir);
+            Path target = dir.resolve(filename);
+            Path temp = dir.resolve(filename + ".tmp");
+            Files.write(temp, data);
+            try {
+                Files.move(temp, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+            } catch (java.nio.file.AtomicMoveNotSupportedException e) {
+                // Cross-filesystem fallback: atomik move desteklenmiyorsa standart replace
+                Files.move(temp, target, StandardCopyOption.REPLACE_EXISTING);
+            }
+        } catch (IOException e) {
+            log.debug("[LOGO] Disk yazma hatasi: {}/{}", subDir, filename);
         }
     }
 
