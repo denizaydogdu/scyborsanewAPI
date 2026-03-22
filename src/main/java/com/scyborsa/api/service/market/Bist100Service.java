@@ -259,7 +259,7 @@ public class Bist100Service {
     private String buildScanBody() {
         return """
                 {
-                  "columns": ["name", "description", "logoid", "close", "change", "volume", "indexes"],
+                  "columns": ["name", "description", "logoid", "close", "change", "volume", "indexes", "open"],
                   "ignore_unknown_fields": false,
                   "options": {"lang": "tr"},
                   "range": [0, 900],
@@ -274,7 +274,7 @@ public class Bist100Service {
      * TradingView Scanner API response'unu parse ederek {@link StockWithIndexes} listesine donusturur.
      *
      * <p>Kolon sirasi: name(d[0]), description(d[1]), logoid(d[2]), close(d[3]),
-     * change(d[4]), volume(d[5]), indexes(d[6]).</p>
+     * change(d[4]), volume(d[5]), indexes(d[6]), open(d[7]).</p>
      *
      * @param responseBody API'den donen JSON response
      * @return parse edilmis hisse listesi (endeks bilgisi dahil)
@@ -321,7 +321,11 @@ public class Bist100Service {
                 // d[6] = indexes array -> proname listesi
                 List<String> indexPronames = extractIndexPronames(dArray);
 
-                SectorStockDto dto = new SectorStockDto(ticker, description, price, changePercent, volume, logoid);
+                // d[7] = open (gunluk acilis fiyati)
+                double open = dArray.size() > 7 && dArray.get(7).isNumber()
+                        ? dArray.get(7).asDouble() : 0.0;
+
+                SectorStockDto dto = new SectorStockDto(ticker, description, price, changePercent, volume, logoid, open);
                 result.add(new StockWithIndexes(dto, indexPronames));
             }
         } catch (Exception e) {

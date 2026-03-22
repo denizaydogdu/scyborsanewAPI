@@ -467,7 +467,7 @@ public class SectorService {
                 String logoid = dArray.size() > 2 && !dArray.get(2).isNull()
                         ? dArray.get(2).asText() : null;
 
-                result.add(new SectorStockDto(ticker, description, price, changePercent, volume, logoid));
+                result.add(new SectorStockDto(ticker, description, price, changePercent, volume, logoid, 0.0));
             }
         } catch (Exception e) {
             log.error("[SECTOR-SERVICE] Response parse hatasi", e);

@@ -35,4 +35,7 @@ public class SectorStockDto {
 
     /** TradingView logo kimligi (or. "turk-hava-yollari"). */
     private String logoid;
+
+    /** Gunluk acilis fiyati (TL). */
+    private double open;
 }
