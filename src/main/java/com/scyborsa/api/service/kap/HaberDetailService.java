@@ -54,6 +54,25 @@ public class HaberDetailService {
     private HttpClient httpClient;
 
     /**
+     * Haber iceriginde izin verilen guvenli HTML tag'leri icin Jsoup Safelist.
+     *
+     * <p>XSS saldirilarina karsi koruma saglar. Izin verilen tag'ler:
+     * p, br, strong, em, b, i, ul, ol, li, table, thead, tbody, tr, th, td,
+     * h1-h6, a (sadece href), span, div, img (sadece src).
+     * script, style, event handler attribute'leri (onclick, onerror vb.) engellenir.</p>
+     */
+    private static final Safelist HABER_SAFELIST = Safelist.none()
+            .addTags("p", "br", "strong", "em", "b", "i",
+                    "ul", "ol", "li",
+                    "table", "thead", "tbody", "tr", "th", "td",
+                    "h1", "h2", "h3", "h4", "h5", "h6",
+                    "a", "span", "div", "img")
+            .addAttributes("a", "href")
+            .addAttributes("img", "src")
+            .addProtocols("a", "href", "http", "https")
+            .addProtocols("img", "src", "http", "https");
+
+    /**
      * HttpClient'i yapilandirilmis connect timeout ile olusturur.
      */
     @PostConstruct
@@ -113,7 +132,7 @@ public class HaberDetailService {
 
             // Sanitize scraped content — XSS onlemi
             String safeContent = content.length() > 0
-                    ? Jsoup.clean(content.toString(), Safelist.relaxed()) : null;
+                    ? sanitizeHtml(content.toString()) : null;
 
             // Extract kap.org.tr link
             String kapUrl = null;
@@ -183,13 +202,28 @@ public class HaberDetailService {
 
             // Sanitize AST-converted HTML — XSS onlemi
             String safeAstContent = astContent != null
-                    ? Jsoup.clean(astContent, Safelist.relaxed()) : null;
+                    ? sanitizeHtml(astContent) : null;
 
             return new String[]{shortDesc, safeAstContent, title};
         } catch (Exception e) {
             log.warn("Story API hatasi [newsId={}]: {}", newsId, e.getMessage());
             return new String[]{null, null};
         }
+    }
+
+    /**
+     * Dis kaynaklardan gelen HTML icerigini XSS saldirilarina karsi temizler.
+     *
+     * <p>{@link #HABER_SAFELIST} ile tanimlanmis guvenli tag ve attribute'ler
+     * disindaki tum HTML icerigini (script, style, event handler'lar vb.) siler.
+     * Haber iceriginin veritabanina yazilmasindan ONCE cagrilmalidir.</p>
+     *
+     * @param html temizlenecek ham HTML icerigi
+     * @return guvenli HTML icerigi (izin verilmeyen tag/attribute'ler cikarilmis)
+     */
+    private String sanitizeHtml(String html) {
+        if (html == null || html.isEmpty()) return html;
+        return Jsoup.clean(html, HABER_SAFELIST);
     }
 
     /**
