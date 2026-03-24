@@ -389,8 +389,8 @@ public class FintablesNewsService {
         KapNewsItemDto dto = new KapNewsItemDto();
         dto.setId("ft-" + item.getId());
         dto.setTitle(item.getTitle());
-        dto.setProvider("Fintables");
-        dto.setSource("Fintables");
+        dto.setProvider("Piyasa");
+        dto.setSource("Piyasa");
         dto.setStoryPath(null);
         dto.setPublished(parsePublishedAt(resolveItemDate(item)));
         dto.setFormattedPublished(formatEpoch(dto.getPublished()));
@@ -440,7 +440,7 @@ public class FintablesNewsService {
         }
 
         dto.setProvider("KAP");
-        dto.setSource("KAP (Fintables)");
+        dto.setSource("KAP");
         dto.setStoryPath(null);
         dto.setPublished(parsePublishedAt(resolveItemDate(item)));
         dto.setFormattedPublished(formatEpoch(dto.getPublished()));
@@ -458,7 +458,7 @@ public class FintablesNewsService {
         String titleHash = item.getTitle() != null ? String.valueOf(item.getTitle().hashCode()) : "0";
         dto.setId("ft-agenda-" + item.getType() + "-" + item.getDay() + "-" + titleHash);
         dto.setTitle(buildAgendaTitle(item));
-        dto.setProvider("Fintables");
+        dto.setProvider("G\u00fcndem");
         dto.setSource(resolveAgendaSource(item.getType()));
         dto.setStoryPath(null);
         dto.setPublished(parseAgendaDateTime(item.getDay(), item.getTime()));
