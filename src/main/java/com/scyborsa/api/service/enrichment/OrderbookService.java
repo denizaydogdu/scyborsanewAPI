@@ -117,8 +117,10 @@ public class OrderbookService {
                                 return data != null ? data : emptyResponse();
                             });
 
-                case LIVE_API:
-                    return fetchWithMemoryCache(stockCode);
+                case LIVE_API: {
+                    OrderbookResponseDto liveData = fetchFromApi(stockCode);
+                    return liveData != null ? liveData : emptyResponse();
+                }
 
                 case DB_FIRST_THEN_API:
                     return readFromDbCache(stockCode, today)
