@@ -87,6 +87,19 @@ public class AppUser {
     @Column(name = "update_time")
     private LocalDateTime updateTime;
 
+    /** Son basarili giris tarihi. */
+    @Column(name = "last_login_date")
+    private LocalDateTime lastLoginDate;
+
+    /** Son basarili giris IP adresi. */
+    @Column(name = "last_login_ip", length = 45)
+    private String lastLoginIp;
+
+    /** Toplam basarili giris sayisi. */
+    @Column(name = "login_count", nullable = false, columnDefinition = "INTEGER DEFAULT 0")
+    @Builder.Default
+    private Integer loginCount = 0;
+
     /**
      * Entity persist edilmeden once createTime alanini set eder.
      */

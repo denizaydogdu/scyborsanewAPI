@@ -1,11 +1,13 @@
 package com.scyborsa.api.controller;
 
+import com.scyborsa.api.dto.auth.LoginHistoryDto;
 import com.scyborsa.api.dto.fintables.FintablesBrokerageDto;
 import com.scyborsa.api.dto.backoffice.BackofficeDashboardDto;
 import com.scyborsa.api.dto.backoffice.ScreenerResultSummaryDto;
 import com.scyborsa.api.dto.backoffice.StockDto;
 import com.scyborsa.api.service.AraciKurumService;
 import com.scyborsa.api.service.BackofficeService;
+import com.scyborsa.api.service.UserService;
 import com.scyborsa.api.service.client.FintablesApiClient;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -33,6 +35,7 @@ public class BackofficeController {
     private final BackofficeService backofficeService;
     private final FintablesApiClient fintablesApiClient;
     private final AraciKurumService araciKurumService;
+    private final UserService userService;
 
     /**
      * Dashboard KPI verilerini dondurur.
@@ -129,6 +132,20 @@ public class BackofficeController {
             return ResponseEntity.internalServerError()
                     .body(Map.of("status", "ERROR", "message", e.getMessage()));
         }
+    }
+
+    /**
+     * Kullanicinin giris gecmisini getirir (son 20 kayit).
+     *
+     * <p>HTTP GET {@code /api/v1/backoffice/users/{userId}/login-history}</p>
+     *
+     * @param userId kullanici ID'si
+     * @return giris gecmisi listesi (en yeni once)
+     */
+    @GetMapping("/users/{userId}/login-history")
+    public ResponseEntity<List<LoginHistoryDto>> getLoginHistory(@PathVariable Long userId) {
+        List<LoginHistoryDto> history = userService.getLoginHistory(userId, 20);
+        return ResponseEntity.ok(history);
     }
 
     /**

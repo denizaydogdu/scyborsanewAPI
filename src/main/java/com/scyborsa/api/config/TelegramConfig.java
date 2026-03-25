@@ -49,6 +49,9 @@ public class TelegramConfig {
     /** KAP haber topic ayarları. */
     private Kap kap = new Kap();
 
+    /** Infografik kart ayarlari. */
+    private Infographic infographic = new Infographic();
+
     /** TradingView chart base URL'i (Telegram mesajlarindaki chart linki). */
     private String chartBaseUrl = "https://www.tradingview.com/chart/?symbol=BIST:";
 
@@ -190,5 +193,16 @@ public class TelegramConfig {
 
         /** Tek çalışmada gönderilecek maksimum haber sayısı. */
         private int maxPerCycle = 5;
+    }
+
+    /**
+     * Telegram infografik kart ayarlari.
+     * Aktif oldugunda hisse mesajlari metin yerine gorsel kart olarak gonderilir.
+     */
+    @Getter
+    @Setter
+    public static class Infographic {
+        /** Infografik kart ozelligi aktif mi? */
+        private boolean enabled = false;
     }
 }

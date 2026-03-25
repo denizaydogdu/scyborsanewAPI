@@ -5,6 +5,8 @@ import com.scyborsa.api.model.screener.ScreenerResultModel;
 import com.scyborsa.api.repository.ScreenerResultRepository;
 import com.scyborsa.api.service.ai.VelzonAiService;
 import com.scyborsa.api.service.chart.ChartScreenshotService;
+import com.scyborsa.api.service.telegram.infographic.StockCardData;
+import com.scyborsa.api.service.telegram.infographic.StockCardRenderer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -70,6 +72,10 @@ public class TelegramSendService {
     /** Chart screenshot servisi (opsiyonel — yoksa text fallback yapilir, ADR-017). */
     @Autowired(required = false)
     private ChartScreenshotService chartScreenshotService;
+
+    /** Infografik kart render servisi (opsiyonel — yoksa text fallback yapilir). */
+    @Autowired(required = false)
+    private StockCardRenderer stockCardRenderer;
 
     // ==================== 2-SESSION DEDUP SET'LERİ ====================
 
@@ -172,55 +178,83 @@ public class TelegramSendService {
                     continue;
                 }
 
-                // Mesaj formatla
-                String message;
+                // Screenshot bir kez çek — her iki path'te kullanılır
                 boolean isGrouped = results.size() > 1;
-                if (isGrouped) {
-                    message = messageFormatter.formatGroupedStockMessage(stockName, results);
-                } else {
-                    message = messageFormatter.formatSingleStockMessage(stockName, results.get(0));
-                }
-
-                // null = KGS filtresi tarafindan engellendi
-                if (message == null) {
-                    continue;
-                }
-
-                // Screenshot denemesi — basarisizsa text fallback
+                boolean infographicSent = false;
+                boolean screenshotAlreadySent = false;
                 byte[] screenshot = captureScreenshotIfEnabled(stockName);
-                boolean sent;
-                if (screenshot != null && screenshot.length > 0) {
-                    // Caption 1024 byte (UTF-8) limitine uygun parcala
-                    byte[] msgBytes = message.getBytes(java.nio.charset.StandardCharsets.UTF_8);
-                    String caption;
-                    String overflow = null;
-                    if (msgBytes.length <= 1024) {
-                        caption = message;
-                    } else {
-                        // Ilk 1024 byte'i caption, kalanini ikinci mesaj olarak gonder
-                        caption = truncateCaptionToBytes(message, 1024);
-                        // Overflow: caption'dan sonraki kisim
-                        int captionCharLen = caption.length() - 3; // "..." haric
-                        overflow = message.substring(captionCharLen);
+
+                // --- INFOGRAPHIC + CHART PATH ---
+                if (isInfographicEnabled()) {
+                    try {
+                        // 1. Önce chart screenshot gönder (grafik)
+                        if (screenshot != null && screenshot.length > 0) {
+                            boolean chartSent = telegramClient.sendPhoto(screenshot,
+                                    "📊 " + stockName);
+                            if (chartSent) {
+                                log.info("[TELEGRAM-SEND] {} chart screenshot gonderildi", stockName);
+                                screenshotAlreadySent = true;
+                            }
+                        }
+
+                        // 2. Sonra infografik kart gönder (veri kartı)
+                        StockCardData cardData = messageFormatter.buildStockCardData(stockName, results);
+                        byte[] infographic = stockCardRenderer.renderCard(cardData);
+                        if (infographic != null && infographic.length > 0) {
+                            boolean photoSent = telegramClient.sendPhoto(infographic, "");
+                            if (photoSent) {
+                                log.info("[TELEGRAM-SEND] {} infografik kart gonderildi", stockName);
+                                infographicSent = true;
+                            } else {
+                                log.warn("[TELEGRAM-SEND] {} infografik gonderilemedi, text fallback", stockName);
+                            }
+                        }
+                    } catch (Exception e) {
+                        log.warn("[TELEGRAM-SEND] {} infografik render hatasi, text fallback: {}",
+                                stockName, e.getMessage());
                     }
-                    sent = telegramClient.sendPhoto(screenshot, caption);
-                    if (sent) {
-                        log.info("[TELEGRAM-SEND] {} screenshot ile gonderildi", stockName);
-                        // Caption asmissa devamini ayri mesaj olarak gonder
-                        if (overflow != null && !overflow.isBlank()) {
-                            telegramClient.sendHtmlMessage(overflow);
-                            log.info("[TELEGRAM-SEND] {} caption devami ayri mesaj gonderildi", stockName);
+                }
+
+                // --- EXISTING TEXT + SCREENSHOT PATH (fallback) ---
+                if (!infographicSent) {
+                    // Mesaj formatla
+                    String message;
+                    if (isGrouped) {
+                        message = messageFormatter.formatGroupedStockMessage(stockName, results);
+                    } else {
+                        message = messageFormatter.formatSingleStockMessage(stockName, results.get(0));
+                    }
+
+                    // null = KGS filtresi tarafindan engellendi
+                    if (message == null) {
+                        continue;
+                    }
+
+                    // Screenshot zaten çekildi — tekrar çekme, zaten gönderildiyse tekrar gönderme
+                    boolean sent;
+                    if (screenshot != null && screenshot.length > 0 && !screenshotAlreadySent) {
+                        // Screenshot + tam mesaj ayrı gönder (caption byte limiti sorununu önler)
+                        String caption = truncateCaptionToBytes(message, 1024);
+                        sent = telegramClient.sendPhoto(screenshot, caption);
+                        if (sent) {
+                            log.info("[TELEGRAM-SEND] {} screenshot ile gonderildi", stockName);
+                            // Caption'a sığmadıysa tam mesajı ayrı gönder
+                            byte[] msgBytes = message.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+                            if (msgBytes.length > 1024) {
+                                telegramClient.sendHtmlMessage(message);
+                                log.info("[TELEGRAM-SEND] {} tam mesaj ayri gonderildi", stockName);
+                            }
+                        } else {
+                            log.warn("[TELEGRAM-SEND] {} screenshot gonderilemedi, text fallback", stockName);
+                            sent = telegramClient.sendHtmlMessage(message);
                         }
                     } else {
-                        log.warn("[TELEGRAM-SEND] {} screenshot gonderilemedi, text fallback", stockName);
                         sent = telegramClient.sendHtmlMessage(message);
                     }
-                } else {
-                    sent = telegramClient.sendHtmlMessage(message);
-                }
-                if (!sent) {
-                    log.warn("[TELEGRAM-SEND] {} icin Telegram gonderilemedi, DB atlanıyor", stockName);
-                    continue;
+                    if (!sent) {
+                        log.warn("[TELEGRAM-SEND] {} icin Telegram gonderilemedi, DB atlanıyor", stockName);
+                        continue;
+                    }
                 }
 
                 // Counter'i basarili gonderimden SONRA artir
@@ -284,6 +318,16 @@ public class TelegramSendService {
         // Ana Telegram mesajlarini bloklamaz (60s timeout riski yok)
         sendAiCommentsForBatch(grouped);
     }
+
+    /**
+     * Infografik kart ozelliginin aktif olup olmadigini kontrol eder.
+     *
+     * @return config aktif ve renderer bean mevcutsa {@code true}
+     */
+    private boolean isInfographicEnabled() {
+        return telegramConfig.getInfographic().isEnabled() && stockCardRenderer != null;
+    }
+
 
     /**
      * Tum basarili gonderimler icin AI yorumlarini toplu isle.

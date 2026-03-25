@@ -1,20 +1,25 @@
 package com.scyborsa.api.service;
 
 import com.scyborsa.api.dto.UserDto;
+import com.scyborsa.api.dto.auth.LoginHistoryDto;
 import com.scyborsa.api.dto.auth.LoginRequestDto;
 import com.scyborsa.api.dto.auth.LoginResponseDto;
 import com.scyborsa.api.enums.UserRoleEnum;
 import com.scyborsa.api.model.AppUser;
+import com.scyborsa.api.model.LoginHistory;
 import com.scyborsa.api.repository.AppUserRepository;
+import com.scyborsa.api.repository.LoginHistoryRepository;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.event.EventListener;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 
 /**
@@ -34,6 +39,9 @@ public class UserService {
 
     /** Kullanici veritabani erisim katmani. */
     private final AppUserRepository appUserRepository;
+
+    /** Giris gecmisi veritabani erisim katmani. */
+    private final LoginHistoryRepository loginHistoryRepository;
 
     /** BCrypt sifre encoder'i. Spring Security context'i olmadan dogrudan kullanilir. */
     private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
@@ -59,6 +67,11 @@ public class UserService {
 
         if (userOpt.isEmpty()) {
             log.warn("Giris denemesi basarisiz — kullanici bulunamadi: {}", request.getEmail());
+            String email = request.getEmail().trim().toLowerCase();
+            String prefix = "UNKNOWN_USER:";
+            int maxEmailLen = 100 - prefix.length();
+            String reason = prefix + (email.length() > maxEmailLen ? email.substring(0, maxEmailLen) : email);
+            recordLoginHistory(null, request, false, reason);
             return fail("Hatali e-posta veya sifre");
         }
 
@@ -66,11 +79,13 @@ public class UserService {
 
         if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
             log.warn("Giris denemesi basarisiz — yanlis sifre: {}", request.getEmail());
+            recordLoginHistory(user, request, false, "BAD_CREDENTIALS");
             return fail("Hatali e-posta veya sifre");
         }
 
         if (!Boolean.TRUE.equals(user.getAktif())) {
             log.warn("Giris denemesi basarisiz — kullanici pasif: {}", request.getEmail());
+            recordLoginHistory(user, request, false, "DISABLED");
             return fail("DISABLED");
         }
 
@@ -78,15 +93,20 @@ public class UserService {
 
         if (user.getValidTo() != null && user.getValidTo().isBefore(today)) {
             log.warn("Giris denemesi basarisiz — erisim suresi dolmus: {}", request.getEmail());
+            recordLoginHistory(user, request, false, "EXPIRED");
             return fail("EXPIRED");
         }
 
         if (user.getValidFrom() != null && user.getValidFrom().isAfter(today)) {
             log.warn("Giris denemesi basarisiz — erisim henuz baslamadi: {}", request.getEmail());
+            recordLoginHistory(user, request, false, "NOT_YET_ACTIVE");
             return fail("NOT_YET_ACTIVE");
         }
 
         log.info("Basarili giris: {} ({})", user.getEmail(), user.getRole());
+        recordLoginHistory(user, request, true, null);
+        updateLoginSummary(user, request.getIpAddress());
+
         return LoginResponseDto.builder()
                 .success(true)
                 .role(user.getRole().name())
@@ -308,6 +328,75 @@ public class UserService {
     }
 
     /**
+     * Kullanicinin giris gecmisini sayfalanmis olarak getirir (backoffice icin).
+     *
+     * @param userId kullanici ID'si
+     * @param limit  maksimum kayit sayisi
+     * @return giris gecmisi DTO listesi
+     */
+    public List<LoginHistoryDto> getLoginHistory(Long userId, int limit) {
+        return loginHistoryRepository.findByAppUserIdOrderByLoginDateDesc(userId, PageRequest.of(0, limit))
+                .stream()
+                .map(h -> LoginHistoryDto.builder()
+                        .id(h.getId())
+                        .loginDate(h.getLoginDate())
+                        .ipAddress(h.getIpAddress())
+                        .userAgent(h.getUserAgent())
+                        .success(h.isSuccess())
+                        .failureReason(h.getFailureReason())
+                        .build())
+                .toList();
+    }
+
+    /**
+     * Giris denemesini login_history tablosuna kaydeder.
+     *
+     * <p>Kayit hatasi giris islemini engellemez (try-catch koruması).</p>
+     *
+     * @param user    giris yapan kullanici
+     * @param request giris istegi (IP ve user-agent bilgisi)
+     * @param success basarili mi
+     * @param reason  basarisizlik nedeni (basarili ise null)
+     */
+    private void recordLoginHistory(AppUser user, LoginRequestDto request, boolean success, String reason) {
+        try {
+            String ip = request.getIpAddress();
+            String truncatedIp = ip != null && ip.length() > 45 ? ip.substring(0, 45) : ip;
+            LoginHistory history = LoginHistory.builder()
+                    .appUser(user)
+                    .loginDate(LocalDateTime.now())
+                    .ipAddress(truncatedIp)
+                    .userAgent(request.getUserAgent() != null && request.getUserAgent().length() > 500
+                            ? request.getUserAgent().substring(0, 500) : request.getUserAgent())
+                    .success(success)
+                    .failureReason(reason)
+                    .build();
+            loginHistoryRepository.save(history);
+        } catch (Exception e) {
+            String userEmail = user != null ? user.getEmail() : "unknown";
+            log.error("Giris gecmisi kaydi basarisiz (kullanici: {}): {}", userEmail, e.getMessage());
+        }
+    }
+
+    /**
+     * Basarili giris sonrasi kullanici ozet bilgilerini gunceller.
+     *
+     * <p>Guncelleme hatasi giris islemini engellemez (try-catch koruması).</p>
+     *
+     * @param user      giris yapan kullanici
+     * @param ipAddress istemci IP adresi
+     */
+    private void updateLoginSummary(AppUser user, String ipAddress) {
+        try {
+            String truncatedIp = ipAddress != null && ipAddress.length() > 45
+                    ? ipAddress.substring(0, 45) : ipAddress;
+            appUserRepository.updateLoginSummary(user.getId(), LocalDateTime.now(), truncatedIp);
+        } catch (Exception e) {
+            log.error("Kullanici giris ozeti guncelleme hatasi ({}): ", user.getEmail(), e);
+        }
+    }
+
+    /**
      * AppUser entity'sini UserDto'ya donusturur. Sifre bilgisi icerilmez.
      *
      * @param user entity
@@ -324,6 +413,9 @@ public class UserService {
                 .validTo(user.getValidTo())
                 .aktif(user.getAktif())
                 .createTime(user.getCreateTime())
+                .lastLoginDate(user.getLastLoginDate())
+                .lastLoginIp(user.getLastLoginIp())
+                .loginCount(user.getLoginCount())
                 .build();
     }
 

@@ -8,10 +8,14 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
+import com.scyborsa.api.service.telegram.infographic.StockCardData;
+
+import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.stream.Collectors;
@@ -260,6 +264,179 @@ public class TelegramMessageFormatter {
                 "🕐 %s\n\n" +
                 "🤖 <i>ScyBorsa Bot</i>",
                 totalSent, groupedCount, singleCount, now);
+    }
+
+    // ==================== INFOGRAPHIC DATA BUILDER ====================
+
+    /**
+     * Infografik kart icin enrichment verilerini toplar.
+     *
+     * <p>Mevcut enrichment servislerini (fon pozisyon, AKD, takas, orderbook)
+     * kullanarak {@link StockCardData} olusturur. Her enrichment bagimsiz
+     * try-catch ile korunur; herhangi biri basarisiz olursa ilgili alan
+     * {@code null} kalir (graceful degradation).</p>
+     *
+     * @param stockName hisse kodu (ornegin "THYAO")
+     * @param results   hisseye ait tarama sonuclari
+     * @return infografik kart veri modeli
+     */
+    public StockCardData buildStockCardData(String stockName, List<ScreenerResultModel> results) {
+        if (results == null || results.isEmpty()) {
+            throw new IllegalArgumentException("results bos olamaz: " + stockName);
+        }
+        ScreenerResultModel latest = results.get(results.size() - 1);
+
+        // --- Fon pozisyonlari ---
+        List<StockCardData.FonPozisyonItem> fonItems = null;
+        int extraFonCount = 0;
+        try {
+            if (fonPozisyonService != null) {
+                List<FonPozisyon> pozisyonlar = fonPozisyonService.getFonPozisyonlari(stockName);
+                if (pozisyonlar != null && !pozisyonlar.isEmpty()) {
+                    int limit = Math.min(3, pozisyonlar.size());
+                    fonItems = new ArrayList<>();
+                    for (int i = 0; i < limit; i++) {
+                        FonPozisyon p = pozisyonlar.get(i);
+                        fonItems.add(StockCardData.FonPozisyonItem.builder()
+                                .fonKodu(p.getFonKodu())
+                                .lotFormatted(formatNominal(p.getNominal()) + "K lot")
+                                .agirlik(String.format("%.2f%%", p.getAgirlik()))
+                                .build());
+                    }
+                    extraFonCount = Math.max(0, pozisyonlar.size() - 3);
+                }
+            }
+        } catch (Exception e) {
+            log.debug("[FORMATTER] Infografik fon verisi alinamadi ({}): {}", stockName, e.getMessage());
+        }
+
+        // --- Kurum dagilimi (AKD) ---
+        List<StockCardData.KurumItem> aliciKurumlar = null;
+        List<StockCardData.KurumItem> saticiKurumlar = null;
+        try {
+            if (perStockAKDService != null) {
+                List<StockBrokerInfo> brokers = perStockAKDService.getStockBrokerDistribution(stockName);
+                if (brokers != null && !brokers.isEmpty()) {
+                    aliciKurumlar = new ArrayList<>();
+                    saticiKurumlar = new ArrayList<>();
+                    for (StockBrokerInfo broker : brokers) {
+                        StockCardData.KurumItem item = StockCardData.KurumItem.builder()
+                                .kurumAdi(broker.getBrokerName())
+                                .formattedVolume(broker.getFormattedVolume())
+                                .build();
+                        if ("🟢".equals(broker.getEmoji())) {
+                            aliciKurumlar.add(item);
+                        } else if ("🔴".equals(broker.getEmoji())) {
+                            saticiKurumlar.add(item);
+                        }
+                    }
+                    if (aliciKurumlar.isEmpty()) aliciKurumlar = null;
+                    if (saticiKurumlar.isEmpty()) saticiKurumlar = null;
+                }
+            }
+        } catch (Exception e) {
+            log.debug("[FORMATTER] Infografik AKD verisi alinamadi ({}): {}", stockName, e.getMessage());
+        }
+
+        // --- Takas dagilimi ---
+        List<StockCardData.TakasItem> takasItems = null;
+        try {
+            if (takasApiService != null && takasApiService.isEnabled()) {
+                LocalDate today = LocalDate.now(ISTANBUL_ZONE);
+                List<TakasCustodianDTO> custodians = takasApiService.getCustodyData(stockName, today);
+                if (custodians != null && !custodians.isEmpty()) {
+                    List<TakasCustodianDTO> top = custodians.stream()
+                            .filter(c -> c.getValue() != null && c.getValue() > 0)
+                            .sorted((a, b) -> Double.compare(b.getValue(), a.getValue()))
+                            .limit(5)
+                            .toList();
+                    if (!top.isEmpty()) {
+                        takasItems = new ArrayList<>();
+                        for (TakasCustodianDTO c : top) {
+                            takasItems.add(StockCardData.TakasItem.builder()
+                                    .custodianCode(c.getCustodianCode())
+                                    .formattedValue(c.getFormattedValue())
+                                    .percentage(c.getPercentage() != null ? c.getPercentage() : 0.0)
+                                    .build());
+                        }
+                    }
+                }
+            }
+        } catch (Exception e) {
+            log.debug("[FORMATTER] Infografik takas verisi alinamadi ({}): {}", stockName, e.getMessage());
+        }
+
+        // --- Emir defteri (orderbook) ---
+        List<StockCardData.EmirItem> alisEmirler = null;
+        List<StockCardData.EmirItem> satisEmirler = null;
+        try {
+            if (orderbookService != null) {
+                OrderbookResponseDto data = orderbookService.getOrderbookTransactions(stockName);
+                if (data != null && data.getTransactions() != null && !data.getTransactions().isEmpty()) {
+                    alisEmirler = data.getTransactions().stream()
+                            .filter(t -> "B".equals(t.getAction()))
+                            .limit(3)
+                            .map(t -> StockCardData.EmirItem.builder()
+                                    .time(t.getTime())
+                                    .price(String.format("%.2f₺", t.getPrice()))
+                                    .lot(formatDerinlikLot(t.getLot()))
+                                    .from(t.getBuyerShortTitle())
+                                    .to(t.getSellerShortTitle())
+                                    .build())
+                            .toList();
+                    satisEmirler = data.getTransactions().stream()
+                            .filter(t -> "S".equals(t.getAction()))
+                            .limit(3)
+                            .map(t -> StockCardData.EmirItem.builder()
+                                    .time(t.getTime())
+                                    .price(String.format("%.2f₺", t.getPrice()))
+                                    .lot(formatDerinlikLot(t.getLot()))
+                                    .from(t.getSellerShortTitle())
+                                    .to(t.getBuyerShortTitle())
+                                    .build())
+                            .toList();
+                    if (alisEmirler.isEmpty()) alisEmirler = null;
+                    if (satisEmirler.isEmpty()) satisEmirler = null;
+                }
+            }
+        } catch (Exception e) {
+            log.debug("[FORMATTER] Infografik orderbook verisi alinamadi ({}): {}", stockName, e.getMessage());
+        }
+
+        // --- Tarama metadata ---
+        long screenerCount = results.stream()
+                .map(ScreenerResultModel::getScreenerName)
+                .distinct().count();
+
+        LocalTime firstTime = results.stream()
+                .map(ScreenerResultModel::getScreenerTime)
+                .filter(java.util.Objects::nonNull)
+                .min(LocalTime::compareTo)
+                .orElse(null);
+        LocalTime lastTime = results.stream()
+                .map(ScreenerResultModel::getScreenerTime)
+                .filter(java.util.Objects::nonNull)
+                .max(LocalTime::compareTo)
+                .orElse(null);
+
+        String timestamp = ZonedDateTime.now(ISTANBUL_ZONE).format(DATETIME_FORMATTER);
+
+        return StockCardData.builder()
+                .stockName(stockName)
+                .price(latest.getPrice())
+                .changePercent(latest.getPercentage())
+                .fonPozisyonlari(fonItems)
+                .extraFonCount(extraFonCount)
+                .aliciKurumlar(aliciKurumlar)
+                .saticiKurumlar(saticiKurumlar)
+                .takasDagilimi(takasItems)
+                .alisEmirler(alisEmirler)
+                .satisEmirler(satisEmirler)
+                .screenerCount((int) screenerCount)
+                .firstSignalTime(firstTime != null ? firstTime.format(TIME_FORMATTER) : null)
+                .lastSignalTime(lastTime != null ? lastTime.format(TIME_FORMATTER) : null)
+                .timestamp(timestamp)
+                .build();
     }
 
     // ==================== SECTION BUILDERS (private) ====================

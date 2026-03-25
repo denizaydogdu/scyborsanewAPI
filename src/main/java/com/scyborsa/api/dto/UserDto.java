@@ -52,4 +52,13 @@ public class UserDto {
     /** Sifre (sadece create/update isteklerinde kullanilir, response'ta null). */
     @ToString.Exclude
     private String password;
+
+    /** Son basarili giris tarihi. */
+    private LocalDateTime lastLoginDate;
+
+    /** Son basarili giris IP adresi. */
+    private String lastLoginIp;
+
+    /** Toplam basarili giris sayisi. */
+    private Integer loginCount;
 }

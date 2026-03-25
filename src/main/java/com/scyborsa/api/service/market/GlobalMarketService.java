@@ -48,12 +48,11 @@ public class GlobalMarketService {
             {
               "symbols": {
                 "tickers": [
-                  "TVC:GOLD", "TVC:SILVER", "NYMEX:CL1!", "TVC:DJI", "SP:SPX",
+                  "TVC:GOLD", "TVC:SILVER", "VELOCITY:BRENT", "TVC:DJI", "SP:SPX",
                   "TVC:DXY", "TVC:NI225", "TVC:KOSPI", "XETR:DAX", "CBOE:VIX",
                   "FX:USDTRY", "FX:EURTRY", "BITSTAMP:BTCUSD", "BITSTAMP:ETHUSD",
                   "AMEX:EEM", "AMEX:TUR",
-                  "COMEX:HG1!", "NYMEX:PA1!", "NYMEX:PL1!",
-                  "BLACKBULL:BRENT"
+                  "COMEX:HG1!", "NYMEX:PA1!", "NYMEX:PL1!"
                 ]
               },
               "columns": ["name", "close", "change", "description"],
@@ -68,11 +67,10 @@ public class GlobalMarketService {
     private static final Map<String, String> CATEGORY_MAP = Map.ofEntries(
             Map.entry("GOLD", "EMTIA"),
             Map.entry("SILVER", "EMTIA"),
-            Map.entry("CL1!", "EMTIA"),
+            Map.entry("BRENT", "EMTIA"),
             Map.entry("HG1!", "EMTIA"),
             Map.entry("PA1!", "EMTIA"),
             Map.entry("PL1!", "EMTIA"),
-            Map.entry("BRENT", "EMTIA"),
             Map.entry("USDTRY", "DOVIZ"),
             Map.entry("EURTRY", "DOVIZ"),
             Map.entry("BTCUSD", "KRIPTO"),

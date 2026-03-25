@@ -21,4 +21,10 @@ public class LoginRequestDto {
     /** Sifre (plain text). */
     @ToString.Exclude
     private String password;
+
+    /** Istemci IP adresi (UI tarafindan gonderilir). */
+    private String ipAddress;
+
+    /** Istemci user-agent bilgisi (UI tarafindan gonderilir). */
+    private String userAgent;
 }

@@ -2,7 +2,12 @@ package com.scyborsa.api.repository;
 
 import com.scyborsa.api.model.AppUser;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -51,4 +56,17 @@ public interface AppUserRepository extends JpaRepository<AppUser, Long> {
      * @return kullanici listesi
      */
     List<AppUser> findAllByOrderByIdAsc();
+
+    /**
+     * Giris ozet bilgilerini atomik olarak gunceller (race condition onlemi).
+     *
+     * @param userId    kullanici ID'si
+     * @param loginDate giris zamani
+     * @param ip        istemci IP adresi
+     * @return guncellenen satir sayisi
+     */
+    @Transactional
+    @Modifying
+    @Query("UPDATE AppUser u SET u.loginCount = COALESCE(u.loginCount, 0) + 1, u.lastLoginDate = :loginDate, u.lastLoginIp = :ip WHERE u.id = :userId")
+    int updateLoginSummary(@Param("userId") Long userId, @Param("loginDate") LocalDateTime loginDate, @Param("ip") String ip);
 }
