@@ -1,6 +1,8 @@
 package com.scyborsa.api.service.chart;
 
+import com.scyborsa.api.service.alert.PriceAlertEngine;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.util.Map;
@@ -21,6 +23,10 @@ import java.util.concurrent.ConcurrentHashMap;
 @Slf4j
 @Component
 public class QuotePriceCache {
+
+    /** Fiyat alarm motoru — mevcut degilse null (graceful degradation). */
+    @Autowired(required = false)
+    private PriceAlertEngine alertEngine;
 
     /** Sembol bazinda fiyat kotasyonlarinin tutuldugu thread-safe cache. */
     private final ConcurrentHashMap<String, QuoteEntry> quotes = new ConcurrentHashMap<>();
@@ -45,6 +51,15 @@ public class QuotePriceCache {
             }
         } else {
             quotes.put(symbol, new QuoteEntry(qsdData, System.currentTimeMillis()));
+        }
+
+        // Fiyat alarm motoru kontrolu
+        if (alertEngine != null) {
+            Object lp = qsdData.get("lp");
+            if (lp instanceof Number) {
+                String stockCode = symbol.replace("BIST:", "");
+                alertEngine.checkPrice(stockCode, ((Number) lp).doubleValue());
+            }
         }
     }
 
