@@ -38,8 +38,8 @@ public class PriceAlertController {
     /**
      * Yeni bir fiyat alarmi olusturur.
      *
-     * @param userId kullanici ID'si
-     * @param req    alarm olusturma istegi
+     * @param email kullanici email adresi
+     * @param req   alarm olusturma istegi
      * @return olusturulan alarm DTO'su
      */
     @PostMapping
@@ -52,7 +52,7 @@ public class PriceAlertController {
     /**
      * Kullanicinin alarmlarini listeler.
      *
-     * @param userId kullanici ID'si
+     * @param email  kullanici email adresi
      * @param status opsiyonel durum filtresi (ACTIVE, TRIGGERED, CANCELLED, EXPIRED)
      * @return alarm DTO listesi
      */
@@ -66,7 +66,7 @@ public class PriceAlertController {
     /**
      * Kullanicinin okunmamis tetiklenmis alarm sayisini doner.
      *
-     * @param userId kullanici ID'si
+     * @param email kullanici email adresi
      * @return okunmamis alarm sayisi
      */
     @GetMapping("/unread-count")
@@ -76,10 +76,29 @@ public class PriceAlertController {
     }
 
     /**
+     * Mevcut bir fiyat alarmini gunceller.
+     *
+     * <p>Sadece aktif alarmlar guncellenebilir. Hisse kodu degistirilemez,
+     * yon, hedef fiyat ve not alanlari guncellenebilir.</p>
+     *
+     * @param email kullanici email adresi
+     * @param id    alarm ID'si
+     * @param req   alarm guncelleme istegi
+     * @return guncellenmis alarm DTO'su
+     */
+    @PutMapping("/{id}")
+    public ResponseEntity<PriceAlertDto> updateAlert(@RequestParam String email,
+                                                     @PathVariable Long id,
+                                                     @Valid @RequestBody CreateAlertRequest req) {
+        PriceAlertDto updated = priceAlertService.updateAlert(resolveUserId(email), id, req);
+        return ResponseEntity.ok(updated);
+    }
+
+    /**
      * Belirtilen alarmi iptal eder.
      *
-     * @param userId kullanici ID'si
-     * @param id     alarm ID'si
+     * @param email kullanici email adresi
+     * @param id    alarm ID'si
      * @return 200 OK
      */
     @PutMapping("/{id}/cancel")
@@ -91,8 +110,8 @@ public class PriceAlertController {
     /**
      * Belirtilen alarmi okundu olarak isaretler.
      *
-     * @param userId kullanici ID'si
-     * @param id     alarm ID'si
+     * @param email kullanici email adresi
+     * @param id    alarm ID'si
      * @return 200 OK
      */
     @PutMapping("/{id}/read")
@@ -104,7 +123,7 @@ public class PriceAlertController {
     /**
      * Kullanicinin tum okunmamis tetiklenmis alarmlarini toplu olarak okundu isaretler.
      *
-     * @param userId kullanici ID'si
+     * @param email kullanici email adresi
      * @return guncellenen kayit sayisi
      */
     @PutMapping("/read-all")
@@ -114,17 +133,11 @@ public class PriceAlertController {
     }
 
     /**
-     * RuntimeException'lari 400 Bad Request olarak doner.
-     *
-     * @param ex hata
-     * @return hata mesaji
-     */
-    /**
      * Email adresinden kullanici ID'sini cikarir.
      *
      * @param email kullanici email adresi
      * @return kullanici ID'si
-     * @throws RuntimeException kullanici bulunamazsa
+     * @throws RuntimeException kullanici bulunamazsa veya email bos ise
      */
     private Long resolveUserId(String email) {
         if (email == null || email.isBlank()) {
@@ -135,6 +148,12 @@ public class PriceAlertController {
                 .getId();
     }
 
+    /**
+     * RuntimeException'lari 400 Bad Request olarak doner.
+     *
+     * @param ex yakalanan calisma zamani hatasi
+     * @return hata mesaji iceren JSON yanit
+     */
     @ExceptionHandler(RuntimeException.class)
     public ResponseEntity<Map<String, String>> handleRuntimeException(RuntimeException ex) {
         log.warn("Alarm islemi hatasi: {}", ex.getMessage());

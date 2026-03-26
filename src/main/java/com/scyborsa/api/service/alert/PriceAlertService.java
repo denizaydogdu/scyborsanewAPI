@@ -98,8 +98,9 @@ public class PriceAlertService {
         AppUser user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("Kullanici bulunamadi: " + userId));
 
-        // Anlik fiyat (opsiyonel)
+        // Anlik fiyat: cache'ten veya istemciden gelen deger
         Double currentPrice = getCurrentPrice(req.getStockCode().toUpperCase());
+        Double priceAtCreation = currentPrice != null ? currentPrice : req.getPriceAtCreation();
 
         // Entity olustur ve kaydet
         PriceAlert alert = PriceAlert.builder()
@@ -109,7 +110,7 @@ public class PriceAlertService {
                 .stockName(req.getStockName())
                 .direction(direction)
                 .targetPrice(req.getTargetPrice())
-                .priceAtCreation(currentPrice)
+                .priceAtCreation(priceAtCreation)
                 .note(req.getNote() != null && req.getNote().length() > 200
                         ? req.getNote().substring(0, 200) : req.getNote())
                 .build();
@@ -233,6 +234,64 @@ public class PriceAlertService {
             log.info("Toplu okundu isaretleme: userId={}, count={}", userId, updated);
         }
         return updated;
+    }
+
+    /**
+     * Mevcut bir fiyat alarmini gunceller.
+     *
+     * <p>Sadece aktif alarmlar guncellenebilir. Hisse kodu degistirilemez,
+     * yon, hedef fiyat ve not alanlari guncellenebilir. Alarm motoru indeksi
+     * eski degerlerle cikarilip yeni degerlerle yeniden eklenir.</p>
+     *
+     * @param userId  kullanici ID'si (sahiplik dogrulamasi icin)
+     * @param alertId alarm ID'si
+     * @param req     alarm guncelleme istegi
+     * @return guncellenmis alarmin DTO'su
+     * @throws RuntimeException alarm bulunamazsa, kullaniciya ait degilse veya aktif degilse
+     */
+    @Transactional
+    public PriceAlertDto updateAlert(Long userId, Long alertId, CreateAlertRequest req) {
+        PriceAlert alert = alertRepository.findById(alertId)
+                .orElseThrow(() -> new RuntimeException("Alarm bulunamadi: " + alertId));
+
+        if (!alert.getUser().getId().equals(userId)) {
+            throw new RuntimeException("Bu alarm size ait degil");
+        }
+
+        if (alert.getStatus() != AlertStatus.ACTIVE) {
+            throw new RuntimeException("Sadece aktif alarmlar duzenlenebilir");
+        }
+
+        // Alanlari guncelle
+        if (req.getDirection() == null || req.getDirection().isBlank()) {
+            throw new RuntimeException("Alarm yonu belirtilmelidir");
+        }
+
+        AlertDirection direction;
+        try {
+            direction = AlertDirection.valueOf(req.getDirection().toUpperCase());
+        } catch (IllegalArgumentException e) {
+            throw new RuntimeException("Gecersiz alarm yonu: " + req.getDirection() + " (ABOVE veya BELOW olmali)");
+        }
+
+        alert.setDirection(direction);
+        alert.setTargetPrice(req.getTargetPrice());
+        alert.setNote(req.getNote() != null && req.getNote().length() > 200
+                ? req.getNote().substring(0, 200) : req.getNote());
+        // stockCode degistirilemez
+
+        // Kaydet, sonra indeks guncelle (save-first pattern)
+        PriceAlert saved = alertRepository.save(alert);
+
+        if (alertEngine != null) {
+            alertEngine.removeFromIndex(alert);
+            alertEngine.addToIndex(saved);
+        }
+
+        log.info("Fiyat alarmi guncellendi: alertId={}, userId={}, direction={}, targetPrice={}",
+                alertId, userId, direction, saved.getTargetPrice());
+
+        return toDto(saved);
     }
 
     // ==================== PRIVATE HELPERS ====================

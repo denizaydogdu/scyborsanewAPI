@@ -163,43 +163,47 @@ public class PriceAlertEngine {
         // DB + WS islemleri async — WebSocket thread'i bloklama
         try {
         CompletableFuture.runAsync(() -> {
+        boolean dbSaved = false;
         try {
             // 1. Veritabanini guncelle
             alert.setStatus(AlertStatus.TRIGGERED);
             alert.setTriggerPrice(currentPrice);
             alert.setTriggeredAt(LocalDateTime.now());
             alertRepository.save(alert);
+            dbSaved = true;
 
             // 2. Kullaniciya WebSocket bildirimi gonder
             String userEmail = alert.getUserEmail();
-            if (userEmail == null || userEmail.isBlank()) {
-                log.warn("[ALERT-ENGINE] Alarm icin userEmail eksik: alertId={}", alert.getId());
-                return;
+            if (userEmail != null && !userEmail.isBlank()) {
+                AlertNotificationDto notification = AlertNotificationDto.builder()
+                        .alertId(alert.getId())
+                        .stockCode(alert.getStockCode())
+                        .stockName(alert.getStockName())
+                        .direction(alert.getDirection().name())
+                        .targetPrice(alert.getTargetPrice())
+                        .triggerPrice(currentPrice)
+                        .triggeredAt(alert.getTriggeredAt())
+                        .message(buildMessage(alert, currentPrice))
+                        .build();
+
+                messagingTemplate.convertAndSendToUser(
+                        userEmail, "/queue/notifications", notification);
             }
-
-            AlertNotificationDto notification = AlertNotificationDto.builder()
-                    .alertId(alert.getId())
-                    .stockCode(alert.getStockCode())
-                    .stockName(alert.getStockName())
-                    .direction(alert.getDirection().name())
-                    .targetPrice(alert.getTargetPrice())
-                    .triggerPrice(currentPrice)
-                    .triggeredAt(alert.getTriggeredAt())
-                    .message(buildMessage(alert, currentPrice))
-                    .build();
-
-            messagingTemplate.convertAndSendToUser(
-                    userEmail, "/queue/notifications", notification);
 
             log.info("[ALERT-ENGINE] Alarm tetiklendi: {} {} {} fiyat={}",
                     alert.getStockCode(), alert.getDirection(), alert.getTargetPrice(), currentPrice);
         } catch (Exception e) {
-            log.error("[ALERT-ENGINE] Alarm tetikleme hatasi: alertId={}", alert.getId(), e);
-            // DB kaydi basarisiz — tum mutasyonlari geri al, sonraki tick'te tekrar denensin
-            alert.setStatus(AlertStatus.ACTIVE);
-            alert.setTriggerPrice(null);
-            alert.setTriggeredAt(null);
-            addToIndex(alert);
+            if (!dbSaved) {
+                // DB kaydi basarisiz — tum mutasyonlari geri al, sonraki tick'te tekrar denensin
+                log.error("[ALERT-ENGINE] Alarm DB kaydi basarisiz, tekrar denenecek: alertId={}", alert.getId(), e);
+                alert.setStatus(AlertStatus.ACTIVE);
+                alert.setTriggerPrice(null);
+                alert.setTriggeredAt(null);
+                addToIndex(alert);
+            } else {
+                // DB OK ama WS gonderilemedi — alarm tetiklendi, bildirim sonra gonderilecek
+                log.error("[ALERT-ENGINE] WS bildirim gonderilemedi, DB kaydi OK: alertId={}", alert.getId(), e);
+            }
         } finally {
             inFlightTriggers.remove(alert.getId());
         }

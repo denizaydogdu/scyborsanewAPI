@@ -34,6 +34,9 @@ public class CreateAlertRequest {
     @DecimalMin(value = "0.01")
     private Double targetPrice;
 
+    /** Alarm olusturuldugundaki mevcut fiyat (opsiyonel). */
+    private Double priceAtCreation;
+
     /** Kullanicinin opsiyonel notu (maks 200 karakter). */
     @Size(max = 200)
     private String note;
