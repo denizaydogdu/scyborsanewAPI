@@ -33,6 +33,7 @@ import java.util.Map;
 public class PriceAlertController {
 
     private final PriceAlertService priceAlertService;
+    private final com.scyborsa.api.repository.AppUserRepository appUserRepository;
 
     /**
      * Yeni bir fiyat alarmi olusturur.
@@ -42,9 +43,9 @@ public class PriceAlertController {
      * @return olusturulan alarm DTO'su
      */
     @PostMapping
-    public ResponseEntity<PriceAlertDto> createAlert(@RequestParam Long userId,
+    public ResponseEntity<PriceAlertDto> createAlert(@RequestParam String email,
                                                      @Valid @RequestBody CreateAlertRequest req) {
-        PriceAlertDto created = priceAlertService.createAlert(userId, req);
+        PriceAlertDto created = priceAlertService.createAlert(resolveUserId(email), req);
         return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
 
@@ -56,9 +57,9 @@ public class PriceAlertController {
      * @return alarm DTO listesi
      */
     @GetMapping
-    public ResponseEntity<List<PriceAlertDto>> getUserAlerts(@RequestParam Long userId,
+    public ResponseEntity<List<PriceAlertDto>> getUserAlerts(@RequestParam String email,
                                                              @RequestParam(required = false) String status) {
-        List<PriceAlertDto> alerts = priceAlertService.getUserAlerts(userId, status);
+        List<PriceAlertDto> alerts = priceAlertService.getUserAlerts(resolveUserId(email), status);
         return ResponseEntity.ok(alerts);
     }
 
@@ -69,9 +70,9 @@ public class PriceAlertController {
      * @return okunmamis alarm sayisi
      */
     @GetMapping("/unread-count")
-    public ResponseEntity<Map<String, Long>> getUnreadCount(@RequestParam Long userId) {
-        long count = priceAlertService.getUnreadCount(userId);
-        return ResponseEntity.ok(Map.of("unreadCount", count));
+    public ResponseEntity<Map<String, Long>> getUnreadCount(@RequestParam String email) {
+        long count = priceAlertService.getUnreadCount(resolveUserId(email));
+        return ResponseEntity.ok(Map.of("count", count));
     }
 
     /**
@@ -82,8 +83,8 @@ public class PriceAlertController {
      * @return 200 OK
      */
     @PutMapping("/{id}/cancel")
-    public ResponseEntity<Void> cancelAlert(@RequestParam Long userId, @PathVariable Long id) {
-        priceAlertService.cancelAlert(userId, id);
+    public ResponseEntity<Void> cancelAlert(@RequestParam String email, @PathVariable Long id) {
+        priceAlertService.cancelAlert(resolveUserId(email), id);
         return ResponseEntity.ok().build();
     }
 
@@ -95,8 +96,8 @@ public class PriceAlertController {
      * @return 200 OK
      */
     @PutMapping("/{id}/read")
-    public ResponseEntity<Void> markRead(@RequestParam Long userId, @PathVariable Long id) {
-        priceAlertService.markRead(userId, id);
+    public ResponseEntity<Void> markRead(@RequestParam String email, @PathVariable Long id) {
+        priceAlertService.markRead(resolveUserId(email), id);
         return ResponseEntity.ok().build();
     }
 
@@ -107,8 +108,8 @@ public class PriceAlertController {
      * @return guncellenen kayit sayisi
      */
     @PutMapping("/read-all")
-    public ResponseEntity<Map<String, Integer>> markAllRead(@RequestParam Long userId) {
-        int updated = priceAlertService.markAllRead(userId);
+    public ResponseEntity<Map<String, Integer>> markAllRead(@RequestParam String email) {
+        int updated = priceAlertService.markAllRead(resolveUserId(email));
         return ResponseEntity.ok(Map.of("updatedCount", updated));
     }
 
@@ -118,6 +119,22 @@ public class PriceAlertController {
      * @param ex hata
      * @return hata mesaji
      */
+    /**
+     * Email adresinden kullanici ID'sini cikarir.
+     *
+     * @param email kullanici email adresi
+     * @return kullanici ID'si
+     * @throws RuntimeException kullanici bulunamazsa
+     */
+    private Long resolveUserId(String email) {
+        if (email == null || email.isBlank()) {
+            throw new RuntimeException("Email parametresi zorunludur");
+        }
+        return appUserRepository.findByEmail(email.trim().toLowerCase())
+                .orElseThrow(() -> new RuntimeException("Kullanici bulunamadi: " + email))
+                .getId();
+    }
+
     @ExceptionHandler(RuntimeException.class)
     public ResponseEntity<Map<String, String>> handleRuntimeException(RuntimeException ex) {
         log.warn("Alarm islemi hatasi: {}", ex.getMessage());
