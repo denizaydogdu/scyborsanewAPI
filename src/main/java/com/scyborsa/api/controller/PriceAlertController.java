@@ -2,6 +2,7 @@ package com.scyborsa.api.controller;
 
 import com.scyborsa.api.dto.alert.CreateAlertRequest;
 import com.scyborsa.api.dto.alert.PriceAlertDto;
+import com.scyborsa.api.repository.AppUserRepository;
 import com.scyborsa.api.service.alert.PriceAlertService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -33,7 +34,7 @@ import java.util.Map;
 public class PriceAlertController {
 
     private final PriceAlertService priceAlertService;
-    private final com.scyborsa.api.repository.AppUserRepository appUserRepository;
+    private final AppUserRepository appUserRepository;
 
     /**
      * Yeni bir fiyat alarmi olusturur.
@@ -101,7 +102,7 @@ public class PriceAlertController {
      * @param id    alarm ID'si
      * @return 200 OK
      */
-    @PutMapping("/{id}/cancel")
+    @DeleteMapping("/{id}")
     public ResponseEntity<Void> cancelAlert(@RequestParam String email, @PathVariable Long id) {
         priceAlertService.cancelAlert(resolveUserId(email), id);
         return ResponseEntity.ok().build();
