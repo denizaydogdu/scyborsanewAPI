@@ -49,6 +49,9 @@ public class PriceAlertDto {
     /** Tetiklenme zamani. */
     private LocalDateTime triggeredAt;
 
+    /** Alarm iptal edilme zamani. */
+    private LocalDateTime cancelledAt;
+
     /** Kullanicinin bildirimi okudugu zaman. */
     private LocalDateTime readAt;
 

@@ -87,6 +87,10 @@ public class PriceAlert {
     @Column(name = "read_at")
     private LocalDateTime readAt;
 
+    /** Alarm iptal edilme zamani. */
+    @Column(name = "cancelled_at")
+    private LocalDateTime cancelledAt;
+
     /** Kullanicinin opsiyonel notu (maks 200 karakter). */
     @Column(name = "note", length = 200)
     private String note;

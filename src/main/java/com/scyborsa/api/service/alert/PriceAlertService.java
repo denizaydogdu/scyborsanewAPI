@@ -185,6 +185,7 @@ public class PriceAlertService {
         }
 
         alert.setStatus(AlertStatus.CANCELLED);
+        alert.setCancelledAt(LocalDateTime.now());
         alertRepository.save(alert);
 
         log.info("Fiyat alarmi iptal edildi: alertId={}, userId={}", alertId, userId);
@@ -313,6 +314,7 @@ public class PriceAlertService {
                 .status(alert.getStatus() != null ? alert.getStatus().name() : null)
                 .triggerPrice(alert.getTriggerPrice())
                 .triggeredAt(alert.getTriggeredAt())
+                .cancelledAt(alert.getCancelledAt())
                 .readAt(alert.getReadAt())
                 .note(alert.getNote())
                 .createTime(alert.getCreateTime())
