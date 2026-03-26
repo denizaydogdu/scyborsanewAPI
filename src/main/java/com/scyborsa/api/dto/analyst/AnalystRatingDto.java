@@ -2,6 +2,7 @@ package com.scyborsa.api.dto.analyst;
 
 import com.fasterxml.jackson.annotation.JsonAlias;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -51,6 +52,10 @@ public class AnalystRatingDto {
     /** Model portfoy tavsiyesi mi. */
     @JsonAlias("in_model_portfolio")
     private boolean modelPortfolio;
+
+    /** Katilim endeksi uyesi mi? */
+    @JsonProperty("katilim")
+    private boolean katilim;
 
     /**
      * Araci kurum bilgisi DTO'su.

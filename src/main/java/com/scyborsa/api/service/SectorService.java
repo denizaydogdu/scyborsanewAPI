@@ -7,6 +7,7 @@ import com.scyborsa.api.config.TradingViewConfig;
 import com.scyborsa.api.dto.sector.SectorDefinitionDto;
 import com.scyborsa.api.dto.sector.SectorStockDto;
 import com.scyborsa.api.dto.sector.SectorSummaryDto;
+import com.scyborsa.api.service.KatilimEndeksiService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -60,6 +61,9 @@ public class SectorService {
     /** JSON tabanli sektor tanim registry'si. */
     private final SectorDefinitionRegistry registry;
 
+    /** Katilim endeksi uyelik kontrolu servisi. */
+    private final KatilimEndeksiService katilimEndeksiService;
+
     /** HTTP istekleri icin Java 11 HttpClient. */
     private final HttpClient httpClient;
 
@@ -79,16 +83,19 @@ public class SectorService {
     /**
      * Constructor injection ile bagimliliklari alir ve HTTP client olusturur.
      *
-     * @param tradingViewConfig TradingView API konfigurasyonu (URL, cookie, header)
-     * @param objectMapper      JSON parse icin Jackson ObjectMapper
-     * @param registry          sektor tanim registry'si
+     * @param tradingViewConfig    TradingView API konfigurasyonu (URL, cookie, header)
+     * @param objectMapper         JSON parse icin Jackson ObjectMapper
+     * @param registry             sektor tanim registry'si
+     * @param katilimEndeksiService katilim endeksi uyelik kontrolu servisi
      */
     public SectorService(TradingViewConfig tradingViewConfig,
                          ObjectMapper objectMapper,
-                         SectorDefinitionRegistry registry) {
+                         SectorDefinitionRegistry registry,
+                         KatilimEndeksiService katilimEndeksiService) {
         this.tradingViewConfig = tradingViewConfig;
         this.objectMapper = objectMapper;
         this.registry = registry;
+        this.katilimEndeksiService = katilimEndeksiService;
         this.screenerUrl = tradingViewConfig.getScreenerApiUrl();
         this.httpClient = HttpClient.newBuilder()
                 .connectTimeout(Duration.ofSeconds(tradingViewConfig.getHttpConnectTimeoutSeconds()))
@@ -162,6 +169,7 @@ public class SectorService {
                                 .changePercent(Math.round(s.changePercent() * 100.0) / 100.0)
                                 .volume(s.volume())
                                 .logoid(s.logoid())
+                                .katilim(katilimEndeksiService.isKatilim(s.ticker()))
                                 .build())
                         .toList();
             }
@@ -467,7 +475,8 @@ public class SectorService {
                 String logoid = dArray.size() > 2 && !dArray.get(2).isNull()
                         ? dArray.get(2).asText() : null;
 
-                result.add(new SectorStockDto(ticker, description, price, changePercent, volume, logoid, 0.0));
+                result.add(new SectorStockDto(ticker, description, price, changePercent, volume, logoid, 0.0,
+                        katilimEndeksiService.isKatilim(ticker)));
             }
         } catch (Exception e) {
             log.error("[SECTOR-SERVICE] Response parse hatasi", e);

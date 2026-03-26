@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.scyborsa.api.config.TradingViewConfig;
 import com.scyborsa.api.dto.sector.SectorStockDto;
+import com.scyborsa.api.service.KatilimEndeksiService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -50,6 +51,9 @@ public class Bist100Service {
     /** JSON parse icin Jackson ObjectMapper. */
     private final ObjectMapper objectMapper;
 
+    /** Katilim endeksi uyelik kontrolu servisi. */
+    private final KatilimEndeksiService katilimEndeksiService;
+
     /** HTTP istekleri icin Java 11 HttpClient. */
     private final HttpClient httpClient;
 
@@ -78,13 +82,16 @@ public class Bist100Service {
     /**
      * Constructor injection ile bagimliliklari alir ve HTTP client olusturur.
      *
-     * @param tradingViewConfig TradingView API konfigurasyonu (URL, cookie, header)
-     * @param objectMapper      JSON parse icin Jackson ObjectMapper
+     * @param tradingViewConfig    TradingView API konfigurasyonu (URL, cookie, header)
+     * @param objectMapper         JSON parse icin Jackson ObjectMapper
+     * @param katilimEndeksiService katilim endeksi uyelik kontrolu servisi
      */
     public Bist100Service(TradingViewConfig tradingViewConfig,
-                          ObjectMapper objectMapper) {
+                          ObjectMapper objectMapper,
+                          KatilimEndeksiService katilimEndeksiService) {
         this.tradingViewConfig = tradingViewConfig;
         this.objectMapper = objectMapper;
+        this.katilimEndeksiService = katilimEndeksiService;
         this.screenerUrl = tradingViewConfig.getScreenerApiUrl();
         this.httpClient = HttpClient.newBuilder()
                 .connectTimeout(Duration.ofSeconds(tradingViewConfig.getHttpConnectTimeoutSeconds()))
@@ -325,7 +332,8 @@ public class Bist100Service {
                 double open = dArray.size() > 7 && dArray.get(7).isNumber()
                         ? dArray.get(7).asDouble() : 0.0;
 
-                SectorStockDto dto = new SectorStockDto(ticker, description, price, changePercent, volume, logoid, open);
+                SectorStockDto dto = new SectorStockDto(ticker, description, price, changePercent, volume, logoid, open,
+                        katilimEndeksiService.isKatilim(ticker));
                 result.add(new StockWithIndexes(dto, indexPronames));
             }
         } catch (Exception e) {

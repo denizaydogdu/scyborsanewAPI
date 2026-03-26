@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.scyborsa.api.config.DjangoApiConfig;
 import com.scyborsa.api.dto.market.RegressionChannelDto;
+import com.scyborsa.api.service.KatilimEndeksiService;
 import com.scyborsa.api.service.client.VelzonApiClient;
 import com.scyborsa.api.utils.BistCacheUtils;
 import lombok.extern.slf4j.Slf4j;
@@ -36,6 +37,7 @@ public class RegressionScreenerService {
     private final ObjectMapper objectMapper;
     private final HttpClient httpClient;
     private final VelzonApiClient velzonApiClient;
+    private final KatilimEndeksiService katilimEndeksiService;
 
     private static final String INDICATOR_SCREENER_PATH = "/screener/ajax/indicator-screener/?timeframe=1d";
     private static final String SCREENER_PATH = "/api/screener/ALL_STOCKS_WITH_INDICATORS";
@@ -57,16 +59,19 @@ public class RegressionScreenerService {
     /**
      * RegressionScreenerService constructor.
      *
-     * @param djangoConfig    Django API konfigurasyonu
-     * @param objectMapper    JSON parser
-     * @param velzonApiClient api.velzon.tr REST istemcisi (logoid icin)
+     * @param djangoConfig         Django API konfigurasyonu
+     * @param objectMapper         JSON parser
+     * @param velzonApiClient      api.velzon.tr REST istemcisi (logoid icin)
+     * @param katilimEndeksiService katilim endeksi uyelik kontrolu servisi
      */
     public RegressionScreenerService(DjangoApiConfig djangoConfig,
                                       ObjectMapper objectMapper,
-                                      VelzonApiClient velzonApiClient) {
+                                      VelzonApiClient velzonApiClient,
+                                      KatilimEndeksiService katilimEndeksiService) {
         this.djangoConfig = djangoConfig;
         this.objectMapper = objectMapper;
         this.velzonApiClient = velzonApiClient;
+        this.katilimEndeksiService = katilimEndeksiService;
         this.httpClient = HttpClient.newBuilder()
                 .connectTimeout(Duration.ofSeconds(djangoConfig.getConnectTimeoutSeconds()))
                 .build();
@@ -97,6 +102,7 @@ public class RegressionScreenerService {
                     .position(r.getPosition())
                     .pctPosition(r.getPctPosition())
                     .logoid(!logoidMap.isEmpty() ? logoidMap.get(r.getSymbol()) : r.getLogoid())
+                    .katilim(katilimEndeksiService.isKatilim(r.getSymbol()))
                     .build();
             result.add(copy);
         }

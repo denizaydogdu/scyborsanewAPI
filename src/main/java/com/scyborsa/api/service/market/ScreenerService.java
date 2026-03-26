@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.scyborsa.api.config.TradingViewConfig;
 import com.scyborsa.api.dto.market.MarketMoverDto;
+import com.scyborsa.api.service.KatilimEndeksiService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
@@ -52,18 +53,24 @@ public class ScreenerService {
     /** JSON parse icin Jackson ObjectMapper. */
     private final ObjectMapper objectMapper;
 
+    /** Katilim endeksi uyelik kontrolu servisi. */
+    private final KatilimEndeksiService katilimEndeksiService;
+
     /** TradingView Scanner API URL'i. */
     private final String screenerUrl;
 
     /**
      * Constructor injection ile bagimliliklari alir ve HTTP client'i olusturur.
      *
-     * @param tradingViewConfig TradingView API konfigürasyonu (URL, cookie)
-     * @param objectMapper      JSON parse icin Jackson ObjectMapper
+     * @param tradingViewConfig    TradingView API konfigürasyonu (URL, cookie)
+     * @param objectMapper         JSON parse icin Jackson ObjectMapper
+     * @param katilimEndeksiService katilim endeksi uyelik kontrolu servisi
      */
-    public ScreenerService(TradingViewConfig tradingViewConfig, ObjectMapper objectMapper) {
+    public ScreenerService(TradingViewConfig tradingViewConfig, ObjectMapper objectMapper,
+                           KatilimEndeksiService katilimEndeksiService) {
         this.tradingViewConfig = tradingViewConfig;
         this.objectMapper = objectMapper;
+        this.katilimEndeksiService = katilimEndeksiService;
         this.screenerUrl = tradingViewConfig.getScreenerApiUrl();
         this.httpClient = HttpClient.newBuilder()
                 .connectTimeout(Duration.ofSeconds(tradingViewConfig.getHttpConnectTimeoutSeconds()))
@@ -171,7 +178,8 @@ public class ScreenerService {
                 double changePercent = dArray.size() > 12 && dArray.get(12).isNumber()
                         ? dArray.get(12).asDouble() : 0.0;
 
-                result.add(new MarketMoverDto(ticker, description, price, changePercent, logoid));
+                result.add(new MarketMoverDto(ticker, description, price, changePercent, logoid,
+                        katilimEndeksiService.isKatilim(ticker)));
             }
         } catch (Exception e) {
             log.error("Screener response parse hatası", e);

@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.scyborsa.api.config.DjangoApiConfig;
 import com.scyborsa.api.dto.market.PatternFormationDto;
+import com.scyborsa.api.service.KatilimEndeksiService;
 import com.scyborsa.api.service.client.VelzonApiClient;
 import com.scyborsa.api.utils.BistCacheUtils;
 import lombok.extern.slf4j.Slf4j;
@@ -36,6 +37,7 @@ public class PatternScreenerService {
     private final ObjectMapper objectMapper;
     private final HttpClient httpClient;
     private final VelzonApiClient velzonApiClient;
+    private final KatilimEndeksiService katilimEndeksiService;
 
     private static final String PATTERN_SCREENER_PATH = "/ajax/pattern-screener-data/";
     private static final String INDICATOR_SCREENER_PATH = "/screener/ajax/indicator-screener/?timeframe=1d";
@@ -59,16 +61,19 @@ public class PatternScreenerService {
     /**
      * PatternScreenerService constructor.
      *
-     * @param djangoConfig    Django API konfigurasyonu
-     * @param objectMapper    JSON parser
-     * @param velzonApiClient api.velzon.tr REST istemcisi (logoid icin)
+     * @param djangoConfig         Django API konfigurasyonu
+     * @param objectMapper         JSON parser
+     * @param velzonApiClient      api.velzon.tr REST istemcisi (logoid icin)
+     * @param katilimEndeksiService katilim endeksi uyelik kontrolu servisi
      */
     public PatternScreenerService(DjangoApiConfig djangoConfig,
                                    ObjectMapper objectMapper,
-                                   VelzonApiClient velzonApiClient) {
+                                   VelzonApiClient velzonApiClient,
+                                   KatilimEndeksiService katilimEndeksiService) {
         this.djangoConfig = djangoConfig;
         this.objectMapper = objectMapper;
         this.velzonApiClient = velzonApiClient;
+        this.katilimEndeksiService = katilimEndeksiService;
         this.httpClient = HttpClient.newBuilder()
                 .connectTimeout(Duration.ofSeconds(djangoConfig.getConnectTimeoutSeconds()))
                 .build();
@@ -100,6 +105,7 @@ public class PatternScreenerService {
                     .period(p.getPeriod())
                     .filename(p.getFilename())
                     .logoid(!logoidMap.isEmpty() ? logoidMap.get(p.getSymbol()) : p.getLogoid())
+                    .katilim(katilimEndeksiService.isKatilim(p.getSymbol()))
                     .build();
             result.add(copy);
         }

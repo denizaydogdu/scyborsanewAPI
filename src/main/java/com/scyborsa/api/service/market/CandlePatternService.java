@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.scyborsa.api.dto.market.CandlePatternStockDto;
 import com.scyborsa.api.dto.sector.SectorStockDto;
+import com.scyborsa.api.service.KatilimEndeksiService;
 import com.scyborsa.api.service.client.VelzonApiClient;
 import com.scyborsa.api.utils.BistCacheUtils;
 import lombok.extern.slf4j.Slf4j;
@@ -34,6 +35,7 @@ public class CandlePatternService {
     private final VelzonApiClient velzonApiClient;
     private final ObjectMapper objectMapper;
     private final Bist100Service bist100Service;
+    private final KatilimEndeksiService katilimEndeksiService;
 
     /** Candlestick pattern API path sablonu. */
     private static final String CANDLE_PATTERN_PATH = "/api/screener/candlestick-patterns/";
@@ -61,15 +63,18 @@ public class CandlePatternService {
     /**
      * CandlePatternService constructor.
      *
-     * @param velzonApiClient api.velzon.tr REST istemcisi
-     * @param objectMapper    JSON parser
-     * @param bist100Service  BIST endeks hisse verileri servisi (fiyat/degisim/hacim zenginlestirme icin)
+     * @param velzonApiClient      api.velzon.tr REST istemcisi
+     * @param objectMapper         JSON parser
+     * @param bist100Service       BIST endeks hisse verileri servisi (fiyat/degisim/hacim zenginlestirme icin)
+     * @param katilimEndeksiService katilim endeksi uyelik kontrolu servisi
      */
     public CandlePatternService(VelzonApiClient velzonApiClient, ObjectMapper objectMapper,
-                                Bist100Service bist100Service) {
+                                Bist100Service bist100Service,
+                                KatilimEndeksiService katilimEndeksiService) {
         this.velzonApiClient = velzonApiClient;
         this.objectMapper = objectMapper;
         this.bist100Service = bist100Service;
+        this.katilimEndeksiService = katilimEndeksiService;
     }
 
     /**
@@ -118,6 +123,7 @@ public class CandlePatternService {
                     .changePercent(sd != null ? sd.getChangePercent() : null)
                     .volume(sd != null ? sd.getVolume() : null)
                     .open(sd != null ? sd.getOpen() : null)
+                    .katilim(katilimEndeksiService.isKatilim(s.getSymbol()))
                     .build();
             result.add(copy);
         }

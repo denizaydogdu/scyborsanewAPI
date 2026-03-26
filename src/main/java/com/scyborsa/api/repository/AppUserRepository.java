@@ -51,6 +51,14 @@ public interface AppUserRepository extends JpaRepository<AppUser, Long> {
     boolean existsByEmail(String email);
 
     /**
+     * Telegram kullanici adinin mevcut olup olmadigini kontrol eder.
+     *
+     * @param telegramUsername telegram kullanici adi
+     * @return mevcutsa true
+     */
+    boolean existsByTelegramUsernameIgnoreCase(String telegramUsername);
+
+    /**
      * Tum kullanicilari ID sirasina gore getirir.
      *
      * @return kullanici listesi

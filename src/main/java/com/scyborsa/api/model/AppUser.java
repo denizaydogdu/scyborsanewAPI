@@ -1,5 +1,6 @@
 package com.scyborsa.api.model;
 
+import com.scyborsa.api.enums.UserGroupEnum;
 import com.scyborsa.api.enums.UserRoleEnum;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
@@ -75,8 +76,23 @@ public class AppUser {
     @Column(name = "valid_to")
     private LocalDate validTo;
 
+    /** Kullanici grubu. {@link UserGroupEnum#STANDART}, {@link UserGroupEnum#OZEL} veya {@link UserGroupEnum#TELEGRAM}. */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "user_group", length = 20, nullable = false, columnDefinition = "VARCHAR(20) DEFAULT 'STANDART'")
+    @Builder.Default
+    private UserGroupEnum userGroup = UserGroupEnum.STANDART;
+
+    /** Telegram kullanici adi (orn. @MacroTrader). */
+    @Column(name = "telegram_username", length = 100)
+    private String telegramUsername;
+
+    /** Telefon numarasi (orn. 555 444 33 22). */
+    @Column(name = "phone_number", length = 20)
+    private String phoneNumber;
+
     /** Aktif/pasif durumu. Soft delete icin kullanilir. */
     @Column(name = "aktif", nullable = false)
+    @Builder.Default
     private Boolean aktif = true;
 
     /** Kayit olusturma zamani. */

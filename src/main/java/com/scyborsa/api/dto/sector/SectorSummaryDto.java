@@ -1,5 +1,6 @@
 package com.scyborsa.api.dto.sector;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -73,5 +74,9 @@ public class SectorSummaryDto {
 
         /** Logo proxy icin logoid. */
         private String logoid;
+
+        /** Katilim endeksi uyesi mi? */
+        @JsonProperty("katilim")
+        private boolean katilim;
     }
 }

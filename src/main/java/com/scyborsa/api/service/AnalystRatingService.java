@@ -32,6 +32,9 @@ public class AnalystRatingService {
     /** Araci kurum is mantigi servisi (sync icin). */
     private final AraciKurumService araciKurumService;
 
+    /** Katilim endeksi uyelik kontrolu servisi. */
+    private final KatilimEndeksiService katilimEndeksiService;
+
     /** Cache: analist tavsiyeleri. */
     private volatile List<AnalystRatingDto> cachedRatings;
 
@@ -48,12 +51,15 @@ public class AnalystRatingService {
     /**
      * Constructor injection ile bagimliliklari alir.
      *
-     * @param fintablesApiClient Fintables API istemcisi
-     * @param araciKurumService araci kurum sync servisi
+     * @param fintablesApiClient    Fintables API istemcisi
+     * @param araciKurumService    araci kurum sync servisi
+     * @param katilimEndeksiService katilim endeksi uyelik kontrolu servisi
      */
-    public AnalystRatingService(FintablesApiClient fintablesApiClient, AraciKurumService araciKurumService) {
+    public AnalystRatingService(FintablesApiClient fintablesApiClient, AraciKurumService araciKurumService,
+                                KatilimEndeksiService katilimEndeksiService) {
         this.fintablesApiClient = fintablesApiClient;
         this.araciKurumService = araciKurumService;
+        this.katilimEndeksiService = katilimEndeksiService;
     }
 
     /**
@@ -80,6 +86,11 @@ public class AnalystRatingService {
             log.info("[ANALYST-RATING] Analist tavsiyeleri Fintables API'den cekiliyor");
             try {
                 List<AnalystRatingDto> allRatings = fetchAllPages();
+
+                // Katilim endeksi zenginlestirmesi
+                for (AnalystRatingDto dto : allRatings) {
+                    dto.setKatilim(katilimEndeksiService.isKatilim(dto.getStockCode()));
+                }
 
                 if (allRatings.isEmpty()) {
                     log.warn("[ANALYST-RATING] API bos sonuc dondurdu");

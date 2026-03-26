@@ -4,8 +4,10 @@ import com.scyborsa.api.dto.kap.HaberDetayDto;
 import com.scyborsa.api.dto.kap.KapHaberDto;
 import com.scyborsa.api.dto.kap.KapNewsItemDto;
 import com.scyborsa.api.dto.kap.KapNewsResponseDto;
+import com.scyborsa.api.dto.kap.KapRelatedSymbolDto;
 import com.scyborsa.api.model.haber.HaberDetay;
 import com.scyborsa.api.repository.HaberDetayRepository;
+import com.scyborsa.api.service.KatilimEndeksiService;
 import com.scyborsa.api.service.kap.FintablesNewsService;
 import com.scyborsa.api.service.kap.HaberDetailFetcher;
 import com.scyborsa.api.service.kap.KapHaberService;
@@ -46,6 +48,7 @@ public class KapHaberController {
     private final FintablesNewsService fintablesNewsService;
     private final HaberDetayRepository haberDetayRepository;
     private final HaberDetailFetcher haberDetailFetcher;
+    private final KatilimEndeksiService katilimEndeksiService;
 
     /** Turkce tarih formatlayici (dd MMM yyyy HH:mm, tr_TR locale). */
     private static final DateTimeFormatter TR_FORMATTER =
@@ -80,6 +83,7 @@ public class KapHaberController {
         List<KapNewsItemDto> ftItems = fintablesNewsService.getKapNewsItems();
         tvResponse.setItems(FintablesNewsService.mergeAndDedup(
                 tvResponse.getItems() != null ? tvResponse.getItems() : List.of(), ftItems));
+        enrichKatilim(tvResponse.getItems());
         return tvResponse;
     }
 
@@ -159,6 +163,32 @@ public class KapHaberController {
         }
 
         return ResponseEntity.ok(toDto(haber));
+    }
+
+    /**
+     * KAP haber listesindeki her bir haberi katılım endeksi bilgisiyle zenginleştirir.
+     *
+     * <p>Haberin {@code relatedSymbols} listesindeki sembollerden herhangi biri
+     * katılım endeksinde ise {@code katilim} alanı {@code true} olarak set edilir.</p>
+     *
+     * @param items zenginleştirilecek KAP haber listesi (nullable)
+     */
+    private void enrichKatilim(List<KapNewsItemDto> items) {
+        if (items == null) return;
+        for (KapNewsItemDto item : items) {
+            if (item.getRelatedSymbols() != null) {
+                for (KapRelatedSymbolDto sym : item.getRelatedSymbols()) {
+                    String code = sym.getSymbol();
+                    if (code != null) {
+                        code = code.startsWith("BIST:") ? code.substring(5) : code;
+                        if (katilimEndeksiService.isKatilim(code)) {
+                            item.setKatilim(true);
+                            break;
+                        }
+                    }
+                }
+            }
+        }
     }
 
     /**

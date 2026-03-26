@@ -43,6 +43,15 @@ public class UserDto {
     /** Erisim bitis tarihi. */
     private LocalDate validTo;
 
+    /** Kullanici grubu. */
+    private String userGroup;
+
+    /** Telegram kullanici adi. */
+    private String telegramUsername;
+
+    /** Telefon numarasi. */
+    private String phoneNumber;
+
     /** Aktif/pasif durumu. */
     private Boolean aktif;
 

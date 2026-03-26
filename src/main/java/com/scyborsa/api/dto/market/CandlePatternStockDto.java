@@ -1,5 +1,6 @@
 package com.scyborsa.api.dto.market;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.*;
 
 import java.util.List;
@@ -45,4 +46,8 @@ public class CandlePatternStockDto {
 
     /** Gunluk acilis fiyati (TL). */
     private Double open;
+
+    /** Katilim endeksi uyesi mi? */
+    @JsonProperty("katilim")
+    private boolean katilim;
 }

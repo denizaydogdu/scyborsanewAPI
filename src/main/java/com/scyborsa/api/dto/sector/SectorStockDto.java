@@ -1,5 +1,6 @@
 package com.scyborsa.api.dto.sector;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -38,4 +39,8 @@ public class SectorStockDto {
 
     /** Gunluk acilis fiyati (TL). */
     private double open;
+
+    /** Katilim endeksi uyesi mi? */
+    @JsonProperty("katilim")
+    private boolean katilim;
 }

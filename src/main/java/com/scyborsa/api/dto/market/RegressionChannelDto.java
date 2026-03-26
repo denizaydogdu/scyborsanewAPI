@@ -1,5 +1,6 @@
 package com.scyborsa.api.dto.market;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -39,4 +40,8 @@ public class RegressionChannelDto {
 
     /** Hisse logosu TradingView logoid'si (orn. "thyao"). */
     private String logoid;
+
+    /** Katilim endeksi uyesi mi? */
+    @JsonProperty("katilim")
+    private boolean katilim;
 }

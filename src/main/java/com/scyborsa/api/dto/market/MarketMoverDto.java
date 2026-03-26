@@ -1,5 +1,6 @@
 package com.scyborsa.api.dto.market;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -32,4 +33,8 @@ public class MarketMoverDto {
 
     /** TradingView logo kimliği (ör. "turk-hava-yollari"). */
     private String logoid;
+
+    /** Katilim endeksi uyesi mi? */
+    @JsonProperty("katilim")
+    private boolean katilim;
 }

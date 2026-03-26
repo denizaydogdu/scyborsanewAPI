@@ -3,6 +3,7 @@ package com.scyborsa.api.service.market;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.scyborsa.api.dto.market.DividendDto;
+import com.scyborsa.api.service.KatilimEndeksiService;
 import com.scyborsa.api.service.client.VelzonApiClient;
 import com.scyborsa.api.utils.BistCacheUtils;
 import lombok.RequiredArgsConstructor;
@@ -36,6 +37,7 @@ public class DividendService {
 
     private final VelzonApiClient velzonApiClient;
     private final ObjectMapper objectMapper;
+    private final KatilimEndeksiService katilimEndeksiService;
 
     private static final String ALL_PATH = "/api/dividends?limit=100";
     private static final int MAX_FUTURE = 5;
@@ -208,14 +210,16 @@ public class DividendService {
                     }
                 }
 
+                String stockCode = stripBistPrefix(getTextOrNull(item, "symbol"));
                 DividendDto dto = DividendDto.builder()
-                        .stockCode(stripBistPrefix(getTextOrNull(item, "symbol")))
+                        .stockCode(stockCode)
                         .companyName(getTextOrNull(item, "companyName"))
                         .dividendAmount(getDoubleOrNull(item, "dividendAmount"))
                         .dividendYield(getDoubleOrNull(item, "dividendYield"))
                         .exDividendDate(exDivDate)
                         .paymentDate(payDate)
                         .currency(getTextOrNull(item, "currency"))
+                        .katilim(katilimEndeksiService.isKatilim(stockCode))
                         .build();
                 dividends.add(dto);
             }

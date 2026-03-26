@@ -33,4 +33,7 @@ public class KapHaberDto {
 
     /** Haberin KAP'ta yayınlanma tarihi (String formatında). */
     private String publishedAt;
+
+    /** Haberin ilişkili olduğu şirketin katılım endeksinde olup olmadığı. */
+    private boolean katilim;
 }

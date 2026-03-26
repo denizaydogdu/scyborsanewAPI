@@ -2,6 +2,7 @@ package com.scyborsa.api.service.kap;
 
 import com.scyborsa.api.dto.kap.KapHaberDto;
 import com.scyborsa.api.repository.KapHaberRepository;
+import com.scyborsa.api.service.KatilimEndeksiService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -29,6 +30,9 @@ public class KapHaberService {
 
     /** KAP haber veritabani erisim katmani. */
     private final KapHaberRepository kapHaberRepository;
+
+    /** Katılım endeksi kontrol servisi. */
+    private final KatilimEndeksiService katilimEndeksiService;
 
     /** Cache TTL (dakika cinsinden). */
     @Value("${kap.cache.ttl-minutes:10}")
@@ -65,6 +69,7 @@ public class KapHaberService {
                         .subject(k.getSubject())
                         .summary(k.getSummary())
                         .publishedAt(k.getPublishedAt())
+                        .katilim(katilimEndeksiService.isKatilim(k.getCompanyCode()))
                         .build())
                 .toList();
 

@@ -46,4 +46,7 @@ public class KapNewsItemDto {
 
     /** Formatlanmış yayınlanma zamanı (örn: "03 Mart 2026 14:30"). Servis tarafından set edilir. */
     private String formattedPublished;
+
+    /** Haberdeki ilişkili sembollerden herhangi birinin katılım endeksinde olup olmadığı. */
+    private boolean katilim;
 }

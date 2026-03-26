@@ -97,7 +97,9 @@ public class UserController {
     public ResponseEntity<UserDto> updateProfil(@PathVariable Long id, @RequestBody Map<String, String> body) {
         String adSoyad = body.get("adSoyad");
         String password = body.get("password");
-        return ResponseEntity.ok(userService.updateProfil(id, adSoyad, password));
+        String telegramUsername = body.get("telegramUsername");
+        String phoneNumber = body.get("phoneNumber");
+        return ResponseEntity.ok(userService.updateProfil(id, adSoyad, password, telegramUsername, phoneNumber));
     }
 
     /**

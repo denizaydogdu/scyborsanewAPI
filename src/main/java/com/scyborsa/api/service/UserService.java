@@ -4,6 +4,7 @@ import com.scyborsa.api.dto.UserDto;
 import com.scyborsa.api.dto.auth.LoginHistoryDto;
 import com.scyborsa.api.dto.auth.LoginRequestDto;
 import com.scyborsa.api.dto.auth.LoginResponseDto;
+import com.scyborsa.api.enums.UserGroupEnum;
 import com.scyborsa.api.enums.UserRoleEnum;
 import com.scyborsa.api.model.AppUser;
 import com.scyborsa.api.model.LoginHistory;
@@ -169,6 +170,11 @@ public class UserService {
             if (emailNorm != null && appUserRepository.existsByEmail(emailNorm)) {
                 throw new RuntimeException("Bu e-posta adresi zaten mevcut: " + emailNorm);
             }
+            // Telegram username duplicate kontrol
+            if (dto.getTelegramUsername() != null && !dto.getTelegramUsername().isBlank()
+                    && appUserRepository.existsByTelegramUsernameIgnoreCase(dto.getTelegramUsername())) {
+                throw new RuntimeException("Bu Telegram adı zaten kullanılıyor: " + dto.getTelegramUsername());
+            }
             if (dto.getPassword() == null || dto.getPassword().isBlank()) {
                 throw new RuntimeException("Yeni kullanici icin sifre zorunludur");
             }
@@ -178,6 +184,9 @@ public class UserService {
                     .password(passwordEncoder.encode(dto.getPassword()))
                     .adSoyad(dto.getAdSoyad())
                     .role(parseRole(dto.getRole()))
+                    .userGroup(parseUserGroup(dto.getUserGroup()))
+                    .telegramUsername(normalizeBlankToNull(dto.getTelegramUsername()))
+                    .phoneNumber(normalizeBlankToNull(dto.getPhoneNumber()))
                     .validFrom(dto.getValidFrom())
                     .validTo(dto.getValidTo())
                     .aktif(dto.getAktif() != null ? dto.getAktif() : true)
@@ -201,10 +210,20 @@ public class UserService {
                 throw new RuntimeException("Bu e-posta adresi zaten mevcut: " + emailNorm);
             }
 
+            // Telegram username degistiyse duplicate kontrol
+            if (dto.getTelegramUsername() != null && !dto.getTelegramUsername().isBlank()
+                    && !dto.getTelegramUsername().equalsIgnoreCase(user.getTelegramUsername())
+                    && appUserRepository.existsByTelegramUsernameIgnoreCase(dto.getTelegramUsername())) {
+                throw new RuntimeException("Bu Telegram adı zaten kullanılıyor: " + dto.getTelegramUsername());
+            }
+
             user.setUsername(dto.getUsername());
             user.setEmail(emailNorm);
             user.setAdSoyad(dto.getAdSoyad());
             user.setRole(parseRole(dto.getRole()));
+            user.setUserGroup(parseUserGroup(dto.getUserGroup()));
+            user.setTelegramUsername(normalizeBlankToNull(dto.getTelegramUsername()));
+            user.setPhoneNumber(normalizeBlankToNull(dto.getPhoneNumber()));
             user.setValidFrom(dto.getValidFrom());
             user.setValidTo(dto.getValidTo());
 
@@ -304,18 +323,33 @@ public class UserService {
      * Rol, aktiflik, gecerlilik tarihleri gibi yonetimsel alanlar
      * degistirilemez.</p>
      *
-     * @param id      kullanici ID'si
-     * @param adSoyad yeni ad soyad bilgisi
-     * @param password yeni sifre (bos veya null ise mevcut sifre korunur)
+     * @param id               kullanici ID'si
+     * @param adSoyad          yeni ad soyad bilgisi
+     * @param password         yeni sifre (bos veya null ise mevcut sifre korunur)
+     * @param telegramUsername telegram kullanici adi (bos veya null ise mevcut korunur)
+     * @param phoneNumber      telefon numarasi (bos veya null ise mevcut korunur)
      * @return guncellenen kullanici DTO'su (sifre bilgisi icerilmez)
      * @throws RuntimeException kullanici bulunamazsa
      */
     @Transactional
-    public UserDto updateProfil(Long id, String adSoyad, String password) {
+    public UserDto updateProfil(Long id, String adSoyad, String password,
+                                 String telegramUsername, String phoneNumber) {
         AppUser user = appUserRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Kullanici bulunamadi: " + id));
 
-        user.setAdSoyad(adSoyad);
+        if (adSoyad != null && !adSoyad.isBlank()) {
+            user.setAdSoyad(adSoyad);
+        }
+
+        // Telegram username degistiyse duplicate kontrol
+        if (telegramUsername != null && !telegramUsername.isBlank()
+                && !telegramUsername.equalsIgnoreCase(user.getTelegramUsername())
+                && appUserRepository.existsByTelegramUsernameIgnoreCase(telegramUsername)) {
+            throw new RuntimeException("Bu Telegram adı zaten kullanılıyor: " + telegramUsername);
+        }
+
+        user.setTelegramUsername(normalizeBlankToNull(telegramUsername));
+        user.setPhoneNumber(normalizeBlankToNull(phoneNumber));
 
         // Sifre sadece dolu gonderilirse guncellenir
         if (password != null && !password.isBlank()) {
@@ -409,6 +443,9 @@ public class UserService {
                 .email(user.getEmail())
                 .adSoyad(user.getAdSoyad())
                 .role(user.getRole().name())
+                .userGroup(user.getUserGroup() != null ? user.getUserGroup().name() : "STANDART")
+                .telegramUsername(user.getTelegramUsername())
+                .phoneNumber(user.getPhoneNumber())
                 .validFrom(user.getValidFrom())
                 .validTo(user.getValidTo())
                 .aktif(user.getAktif())
@@ -435,6 +472,38 @@ public class UserService {
         } catch (IllegalArgumentException e) {
             throw new RuntimeException("Gecersiz rol: " + role + " (ADMIN veya USER olmali)");
         }
+    }
+
+    /**
+     * Kullanici grubu string'ini guvenli bir sekilde {@link UserGroupEnum}'a donusturur.
+     *
+     * <p>{@code null} veya bos deger gonderilirse varsayilan olarak
+     * {@link UserGroupEnum#STANDART} doner.</p>
+     *
+     * @param group kullanici grubu string'i
+     * @return UserGroupEnum degeri (varsayilan: STANDART)
+     */
+    private UserGroupEnum parseUserGroup(String group) {
+        if (group == null || group.isBlank()) {
+            return UserGroupEnum.STANDART;
+        }
+        try {
+            return UserGroupEnum.valueOf(group.toUpperCase());
+        } catch (IllegalArgumentException e) {
+            log.warn("Gecersiz kullanici grubu: '{}', STANDART kullaniliyor", group);
+            return UserGroupEnum.STANDART;
+        }
+    }
+
+    /**
+     * Bos veya blank string'i null'a normalize eder.
+     *
+     * @param value normalize edilecek deger
+     * @return trimlenmiş deger veya null (bos/blank ise)
+     */
+    private String normalizeBlankToNull(String value) {
+        if (value == null || value.isBlank()) return null;
+        return value.trim();
     }
 
     /**

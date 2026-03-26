@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.scyborsa.api.dto.bilanco.*;
+import com.scyborsa.api.service.KatilimEndeksiService;
 import com.scyborsa.api.service.client.GateVelzonApiClient;
 import com.scyborsa.api.utils.BistCacheUtils;
 import lombok.extern.slf4j.Slf4j;
@@ -38,6 +39,7 @@ public class BilancoService {
 
     private final GateVelzonApiClient gateVelzonApiClient;
     private final ObjectMapper objectMapper;
+    private final KatilimEndeksiService katilimEndeksiService;
 
     /** Son bilanco raporlari listesi — volatile cache. */
     private volatile List<SonBilancoRaporDto> cachedSonRaporlar;
@@ -67,12 +69,15 @@ public class BilancoService {
     /**
      * Constructor injection ile bagimliliklari alir.
      *
-     * @param gateVelzonApiClient Gate Velzon API istemcisi
-     * @param objectMapper        JSON parse icin Jackson ObjectMapper
+     * @param gateVelzonApiClient    Gate Velzon API istemcisi
+     * @param objectMapper           JSON parse icin Jackson ObjectMapper
+     * @param katilimEndeksiService  katilim endeksi uyelik kontrolu servisi
      */
-    public BilancoService(GateVelzonApiClient gateVelzonApiClient, ObjectMapper objectMapper) {
+    public BilancoService(GateVelzonApiClient gateVelzonApiClient, ObjectMapper objectMapper,
+                          KatilimEndeksiService katilimEndeksiService) {
         this.gateVelzonApiClient = gateVelzonApiClient;
         this.objectMapper = objectMapper;
+        this.katilimEndeksiService = katilimEndeksiService;
     }
 
     // ── Son Raporlar ──
@@ -159,6 +164,11 @@ public class BilancoService {
 
             List<SonBilancoRaporDto> result = objectMapper.convertValue(
                     dataNode, new TypeReference<List<SonBilancoRaporDto>>() {});
+
+            // Katilim endeksi zenginlestirmesi
+            for (SonBilancoRaporDto dto : result) {
+                dto.setKatilim(katilimEndeksiService.isKatilim(dto.getSymbol()));
+            }
 
             log.info("[BILANCO] API'den {} son rapor alindi", result.size());
             return result;

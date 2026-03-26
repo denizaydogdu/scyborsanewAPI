@@ -7,6 +7,7 @@ import com.scyborsa.api.dto.market.HazirTaramaStockDto;
 import com.scyborsa.api.dto.market.HazirTaramalarResponseDto;
 import com.scyborsa.api.dto.market.PresetStrategyDto;
 import com.scyborsa.api.enums.PresetStrategyEnum;
+import com.scyborsa.api.service.KatilimEndeksiService;
 import com.scyborsa.api.service.client.VelzonApiClient;
 import com.scyborsa.api.utils.BistCacheUtils;
 import lombok.extern.slf4j.Slf4j;
@@ -44,6 +45,9 @@ public class HazirTaramalarService {
     /** Strateji filtre predicate registry'si. */
     private final PresetStrategyRegistry strategyRegistry;
 
+    /** Katilim endeksi uyelik kontrolu servisi. */
+    private final KatilimEndeksiService katilimEndeksiService;
+
     /** api.velzon.tr screener endpoint path'i. */
     private static final String SCREENER_PATH = "/api/screener/ALL_STOCKS_WITH_INDICATORS";
 
@@ -59,16 +63,19 @@ public class HazirTaramalarService {
     /**
      * Constructor injection ile bagimliliklari alir.
      *
-     * @param velzonApiClient  api.velzon.tr REST istemcisi
-     * @param objectMapper     JSON parse icin Jackson ObjectMapper
-     * @param strategyRegistry strateji filtre registry'si
+     * @param velzonApiClient     api.velzon.tr REST istemcisi
+     * @param objectMapper        JSON parse icin Jackson ObjectMapper
+     * @param strategyRegistry    strateji filtre registry'si
+     * @param katilimEndeksiService katilim endeksi uyelik kontrolu servisi
      */
     public HazirTaramalarService(VelzonApiClient velzonApiClient,
                                   ObjectMapper objectMapper,
-                                  PresetStrategyRegistry strategyRegistry) {
+                                  PresetStrategyRegistry strategyRegistry,
+                                  KatilimEndeksiService katilimEndeksiService) {
         this.velzonApiClient = velzonApiClient;
         this.objectMapper = objectMapper;
         this.strategyRegistry = strategyRegistry;
+        this.katilimEndeksiService = katilimEndeksiService;
     }
 
     /**
@@ -288,6 +295,7 @@ public class HazirTaramalarService {
                 .avgVolume10d(getDouble(row, "average_volume_10d_calc"))
                 .avgVolume60d(getDouble(row, "average_volume_60d_calc"))
                 .avgVolume90d(getDouble(row, "average_volume_90d_calc"))
+                .katilim(katilimEndeksiService.isKatilim(getString(row, "name")))
                 .build();
     }
 
