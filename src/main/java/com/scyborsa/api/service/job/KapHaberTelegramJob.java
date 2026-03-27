@@ -66,7 +66,7 @@ public class KapHaberTelegramJob {
      * KAP haber Telegram gonderimini tetikler.
      * Her 10 dakikada bir calisir, 7/24 (hafta sonu dahil).
      */
-    @Scheduled(cron = "0 0/10 * * * *", zone = "Europe/Istanbul")
+    // @Scheduled(cron = "0 0/10 * * * *", zone = "Europe/Istanbul")  // KAP Telegram devre dışı — tekrar aktif edilirken resetDailyState() da aktif edilmeli
     public void run() {
         log.info("[KAP-TELEGRAM-JOB] Cron tetiklendi");
         if (!profileUtils.isProdProfile()) return;
@@ -174,7 +174,7 @@ public class KapHaberTelegramJob {
      * Gunluk dedup set'ini temizler.
      * Her gun gece yarisi calisir.
      */
-    @Scheduled(cron = "0 0 0 * * *", zone = "Europe/Istanbul")
+    // @Scheduled(cron = "0 0 0 * * *", zone = "Europe/Istanbul")  // KAP Telegram devre dışı
     public void resetDailyState() {
         int size = sentNewsIds.size();
         sentNewsIds.clear();

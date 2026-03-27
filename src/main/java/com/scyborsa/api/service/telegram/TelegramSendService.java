@@ -316,7 +316,7 @@ public class TelegramSendService {
 
         // 5. AI yorumlarini ana gonderim tamamlandiktan SONRA isle
         // Ana Telegram mesajlarini bloklamaz (60s timeout riski yok)
-        sendAiCommentsForBatch(grouped);
+        // sendAiCommentsForBatch(grouped);  // AI Telegram devre dışı
     }
 
     /**
