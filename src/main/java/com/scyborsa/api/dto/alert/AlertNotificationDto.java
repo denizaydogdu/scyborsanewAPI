@@ -1,5 +1,6 @@
 package com.scyborsa.api.dto.alert;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -40,6 +41,7 @@ public class AlertNotificationDto {
     private Double triggerPrice;
 
     /** Tetiklenme zamani. */
+    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss")
     private LocalDateTime triggeredAt;
 
     /** Kullaniciya gosterilecek mesaj (orn. "THYAO 315.50₺'ye ulasti"). */

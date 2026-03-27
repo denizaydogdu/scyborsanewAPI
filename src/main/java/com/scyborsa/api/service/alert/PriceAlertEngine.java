@@ -47,6 +47,11 @@ public class PriceAlertEngine {
     private final PriceAlertRepository alertRepository;
     private final SimpMessagingTemplate messagingTemplate;
 
+    /** TradingView WebSocket servisi — alarmlı hisseler için canlı fiyat aboneliği. */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    @org.springframework.context.annotation.Lazy
+    private com.scyborsa.api.service.chart.TradingViewBarService tradingViewBarService;
+
     /** Hisse kodu bazinda aktif alarm indeksi (stockCode → alarm listesi). */
     private final ConcurrentHashMap<String, List<PriceAlert>> alertIndex = new ConcurrentHashMap<>();
 
@@ -74,6 +79,9 @@ public class PriceAlertEngine {
             initialized = true;
             log.info("[ALERT-ENGINE] Aktif alarmlar yuklendi: {} alarm, {} hisse",
                     activeAlerts.size(), alertIndex.size());
+
+            // Alarmlı hisseleri TradingView WebSocket'e subscribe et (canlı fiyat)
+            subscribeAllActiveStocks();
         } catch (Exception e) {
             log.error("[ALERT-ENGINE] Aktif alarm yukleme hatasi", e);
             initialized = true; // Hata olsa da motoru baslatarak yeni alarm eklemelerine izin ver
@@ -124,10 +132,21 @@ public class PriceAlertEngine {
      * @param alert eklenmek istenen alarm
      */
     public void addToIndex(PriceAlert alert) {
-        alertIndex.computeIfAbsent(alert.getStockCode().toUpperCase(),
-                        k -> new CopyOnWriteArrayList<>())
-                .add(alert);
-        log.debug("[ALERT-ENGINE] Alarm indekse eklendi: id={}, stockCode={}", alert.getId(), alert.getStockCode());
+        String stockCode = alert.getStockCode().toUpperCase();
+        boolean[] isNew = {false};
+        alertIndex.compute(stockCode, (k, existing) -> {
+            if (existing == null) {
+                isNew[0] = true;
+                existing = new CopyOnWriteArrayList<>();
+            }
+            existing.add(alert);
+            return existing;
+        });
+        // WS subscribe lock dışında — blocking I/O ConcurrentHashMap lock altında yapılmaz
+        if (isNew[0]) {
+            subscribeToQuote(stockCode);
+        }
+        log.debug("[ALERT-ENGINE] Alarm indekse eklendi: id={}, stockCode={}", alert.getId(), stockCode);
     }
 
     /**
@@ -136,11 +155,57 @@ public class PriceAlertEngine {
      * @param alert cikarilmak istenen alarm
      */
     public void removeFromIndex(PriceAlert alert) {
-        alertIndex.computeIfPresent(alert.getStockCode().toUpperCase(), (k, list) -> {
+        String stockCode = alert.getStockCode().toUpperCase();
+        alertIndex.computeIfPresent(stockCode, (k, list) -> {
             list.removeIf(a -> a.getId().equals(alert.getId()));
-            return list.isEmpty() ? null : list;
+            if (list.isEmpty()) {
+                log.info("[ALERT-ENGINE] {} icin tum alarmlar kaldirildi — WS subscription aktif kalir (fallback)", stockCode);
+                return null;
+            }
+            return list;
         });
-        log.debug("[ALERT-ENGINE] Alarm indeksten cikarildi: id={}, stockCode={}", alert.getId(), alert.getStockCode());
+        log.debug("[ALERT-ENGINE] Alarm indeksten cikarildi: id={}, stockCode={}", alert.getId(), stockCode);
+    }
+
+    /**
+     * Belirtilen hisse kodunu TradingView WebSocket'e canli fiyat aboneligi olarak ekler.
+     *
+     * @param stockCode hisse kodu (orn. "THYAO")
+     */
+    private void subscribeToQuote(String stockCode) {
+        if (tradingViewBarService != null) {
+            try {
+                tradingViewBarService.subscribeQuote("BIST:" + stockCode);
+                log.info("[ALERT-ENGINE] WS quote subscribe: {}", stockCode);
+            } catch (Exception e) {
+                log.warn("[ALERT-ENGINE] WS quote subscribe basarisiz: {} — batch scan fallback", stockCode, e);
+            }
+        }
+    }
+
+    /**
+     * Tum aktif alarmi olan hisseleri TradingView WebSocket'e subscribe eder.
+     * Uygulama baslangicinda cagrilir.
+     */
+    private void subscribeAllActiveStocks() {
+        if (tradingViewBarService == null || alertIndex.isEmpty()) return;
+        try {
+            for (String stockCode : alertIndex.keySet()) {
+                subscribeToQuote(stockCode);
+            }
+            log.info("[ALERT-ENGINE] {} hisse WS quote subscribe edildi", alertIndex.size());
+        } catch (Exception e) {
+            log.warn("[ALERT-ENGINE] Toplu WS subscribe basarisiz — batch scan fallback", e);
+        }
+    }
+
+    /**
+     * Aktif alarmi olan hisse kodlarini doner (batch scan job icin).
+     *
+     * @return aktif alarm olan hisse kodlari seti
+     */
+    public Set<String> getActiveStockCodes() {
+        return Set.copyOf(alertIndex.keySet());
     }
 
     // ==================== PRIVATE HELPERS ====================
@@ -164,6 +229,7 @@ public class PriceAlertEngine {
         try {
         CompletableFuture.runAsync(() -> {
         boolean dbSaved = false;
+        boolean removedInCatch = false;
         try {
             // 1. Veritabanini guncelle
             alert.setStatus(AlertStatus.TRIGGERED);
@@ -199,13 +265,17 @@ public class PriceAlertEngine {
                 alert.setStatus(AlertStatus.ACTIVE);
                 alert.setTriggerPrice(null);
                 alert.setTriggeredAt(null);
+                inFlightTriggers.remove(alert.getId());
+                removedInCatch = true;
                 addToIndex(alert);
             } else {
                 // DB OK ama WS gonderilemedi — alarm tetiklendi, bildirim sonra gonderilecek
                 log.error("[ALERT-ENGINE] WS bildirim gonderilemedi, DB kaydi OK: alertId={}", alert.getId(), e);
             }
         } finally {
-            inFlightTriggers.remove(alert.getId());
+            if (!removedInCatch) {
+                inFlightTriggers.remove(alert.getId());
+            }
         }
         }); // CompletableFuture.runAsync end
         } catch (Exception e) {

@@ -26,6 +26,7 @@ public class QuotePriceCache {
 
     /** Fiyat alarm motoru — mevcut degilse null (graceful degradation). */
     @Autowired(required = false)
+    @org.springframework.context.annotation.Lazy
     private PriceAlertEngine alertEngine;
 
     /** Sembol bazinda fiyat kotasyonlarinin tutuldugu thread-safe cache. */

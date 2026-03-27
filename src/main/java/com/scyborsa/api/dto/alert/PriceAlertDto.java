@@ -1,5 +1,6 @@
 package com.scyborsa.api.dto.alert;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -47,18 +48,22 @@ public class PriceAlertDto {
     private Double triggerPrice;
 
     /** Tetiklenme zamani. */
+    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss")
     private LocalDateTime triggeredAt;
 
     /** Alarm iptal edilme zamani. */
+    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss")
     private LocalDateTime cancelledAt;
 
     /** Kullanicinin bildirimi okudugu zaman. */
+    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss")
     private LocalDateTime readAt;
 
     /** Kullanicinin opsiyonel notu. */
     private String note;
 
     /** Kayit olusturma zamani. */
+    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss")
     private LocalDateTime createTime;
 
     /** Anlik fiyat (sorgu zamaninda zenginlestirilir, DB'de saklanmaz). */

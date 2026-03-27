@@ -275,6 +275,10 @@ public class PriceAlertService {
             throw new RuntimeException("Gecersiz alarm yonu: " + req.getDirection() + " (ABOVE veya BELOW olmali)");
         }
 
+        if (req.getTargetPrice() == null || req.getTargetPrice() <= 0) {
+            throw new RuntimeException("Hedef fiyat 0'dan buyuk olmalidir");
+        }
+
         alert.setDirection(direction);
         alert.setTargetPrice(req.getTargetPrice());
         alert.setNote(req.getNote() != null && req.getNote().length() > 200

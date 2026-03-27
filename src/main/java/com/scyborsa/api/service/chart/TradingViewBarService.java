@@ -8,6 +8,7 @@ import com.scyborsa.api.utils.BistTradingCalendar;
 import com.scyborsa.api.websocket.TradingViewBarWebSocketClient;
 import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
@@ -51,6 +52,11 @@ public class TradingViewBarService {
 
     /** Aktif TradingView WebSocket istemci instance'i (volatile — thread-safe erisim). */
     private volatile TradingViewBarWebSocketClient wsClient;
+
+    /** Fiyat alarmi motoru — reconnect sonrasi alarm hisselerini yeniden subscribe etmek icin. */
+    @Autowired(required = false)
+    @org.springframework.context.annotation.Lazy
+    private com.scyborsa.api.service.alert.PriceAlertEngine priceAlertEngine;
 
     /** Seans açık→kapalı geçişini tespit etmek için önceki durum. */
     private volatile boolean marketWasOpen = false;
@@ -281,6 +287,7 @@ public class TradingViewBarService {
                         }
                         if (client.isConnected()) {
                             resubscribeAll();
+                            resubscribeAlarmQuotes();
                         }
                     } catch (InterruptedException e) {
                         Thread.currentThread().interrupt();
@@ -331,6 +338,26 @@ public class TradingViewBarService {
             String oldSession = sub.getChartSessionId();
             barCache.removeBySessionId(oldSession);
             client.subscribeToBar(sub.getSymbol(), sub.getPeriod(), sub.getRequestedBars());
+        }
+    }
+
+    /**
+     * Reconnect sonrasi alarm hisselerini WS'e yeniden subscribe eder.
+     */
+    private void resubscribeAlarmQuotes() {
+        if (priceAlertEngine == null) {
+            return;
+        }
+        Set<String> alertStocks = priceAlertEngine.getActiveStockCodes();
+        for (String stockCode : alertStocks) {
+            try {
+                subscribeQuote("BIST:" + stockCode);
+            } catch (Exception e) {
+                log.warn("[BAR-SERVICE] Alarm quote re-subscribe basarisiz: {}", stockCode);
+            }
+        }
+        if (!alertStocks.isEmpty()) {
+            log.info("[BAR-SERVICE] {} alarm hissesi WS re-subscribe edildi", alertStocks.size());
         }
     }
 
@@ -459,6 +486,16 @@ public class TradingViewBarService {
         boolean marketNowOpen = BistTradingCalendar.isMarketOpen();
 
         if (marketNowOpen) {
+            if (!marketWasOpen) {
+                // TRANSITION: closed → open
+                log.info("[CHART] Seans açıldı — alarm quote subscribe yenileniyor");
+                marketWasOpen = true;
+                // WS bağlantısı gerekebilir — connect if needed
+                if (!isConnected()) {
+                    connect();
+                }
+                resubscribeAlarmQuotes();
+            }
             marketWasOpen = true;
             return;
         }
