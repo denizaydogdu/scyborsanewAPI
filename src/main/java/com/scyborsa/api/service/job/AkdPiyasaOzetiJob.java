@@ -2,30 +2,48 @@ package com.scyborsa.api.service.job;
 
 import com.scyborsa.api.config.TelegramConfig;
 import com.scyborsa.api.dto.enrichment.BrokerageAkdListResponseDto;
+import com.scyborsa.api.dto.enrichment.BrokerageAkdListResponseDto.BrokerageAkdItemDto;
 import com.scyborsa.api.service.enrichment.BrokerageAkdListService;
 import com.scyborsa.api.service.telegram.AkdPiyasaOzetiTelegramBuilder;
 import com.scyborsa.api.service.telegram.TelegramClient;
+import com.scyborsa.api.service.telegram.TelegramVolumeFormatter;
+import com.scyborsa.api.service.telegram.infographic.AkdSummaryCardData;
+import com.scyborsa.api.service.telegram.infographic.AkdSummaryCardRenderer;
 import com.scyborsa.api.utils.BistTradingCalendar;
 import com.scyborsa.api.utils.ProfileUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.scheduling.annotation.Schedules;
 import org.springframework.stereotype.Component;
+
+import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
+import java.util.Comparator;
+import java.util.List;
 
 /**
  * AKD Piyasa Özeti Telegram gönderim job'u.
  *
  * <p>SC ile birebir uyumlu 18 sabit zamanda top 5 alıcı ve top 5 satıcı
- * kurumları Telegram'a gönderir.</p>
+ * kurumları Telegram'a gönderir. İnfografik kart birincil yol,
+ * text mesaj fallback olarak kullanılır.</p>
  *
  * @see AkdPiyasaOzetiTelegramBuilder
+ * @see AkdSummaryCardRenderer
  * @see BrokerageAkdListService
  */
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class AkdPiyasaOzetiJob {
+
+    /** Gösterilecek maksimum kurum sayısı (alıcı ve satıcı için ayrı). */
+    private static final int TOP_COUNT = 5;
+
+    /** Saat formatlayıcı (HH:mm). */
+    private static final DateTimeFormatter TIME_FMT = DateTimeFormatter.ofPattern("HH:mm");
 
     /** Telegram mesaj gonderim istemcisi. */
     private final TelegramClient telegramClient;
@@ -41,6 +59,10 @@ public class AkdPiyasaOzetiJob {
 
     /** AKD piyasa ozeti Telegram mesaj olusturucu. */
     private final AkdPiyasaOzetiTelegramBuilder builder;
+
+    /** AKD piyasa özeti infografik kartı renderer (graceful degradation). */
+    @Autowired(required = false)
+    private AkdSummaryCardRenderer cardRenderer;
 
     /**
      * AKD piyasa özeti Telegram gönderimini tetikler.
@@ -68,21 +90,101 @@ public class AkdPiyasaOzetiJob {
 
         try {
             BrokerageAkdListResponseDto response = brokerageAkdListService.getAkdList(null);
-            String message = builder.build(response);
+            boolean sent = false;
 
-            if (message != null) {
-                boolean sent = telegramClient.sendHtmlMessage(message);
-                if (sent) {
-                    telegramClient.sendHtmlMessage("****************************************");
-                    log.info("[AKD-OZET-JOB] Piyasa kurumsal özet gönderildi");
-                } else {
-                    log.warn("[AKD-OZET-JOB] Mesaj gönderilemedi");
+            // İnfografik kart denemesi (birincil yol)
+            if (cardRenderer != null && telegramConfig.getInfographic().isEnabled()) {
+                try {
+                    AkdSummaryCardData cardData = buildCardData(response);
+                    if (cardData != null) {
+                        byte[] png = cardRenderer.renderCard(cardData);
+                        if (png != null) {
+                            sent = telegramClient.sendPhoto(png, "");
+                            if (sent) {
+                                log.info("[AKD-OZET-JOB] İnfografik kart gönderildi ({} KB)",
+                                        png.length / 1024);
+                            }
+                        }
+                    }
+                } catch (Exception e) {
+                    log.warn("[AKD-OZET-JOB] İnfografik kart oluşturulamadı, text fallback: {}",
+                            e.getMessage());
                 }
+            }
+
+            // Fallback: text mesaj
+            if (!sent) {
+                String message = builder.build(response);
+                if (message != null) {
+                    sent = telegramClient.sendHtmlMessage(message);
+                }
+            }
+
+            if (sent) {
+                long rateLimitMs = telegramConfig.getSendRateLimitMs();
+                if (rateLimitMs > 0) Thread.sleep(rateLimitMs);
+                telegramClient.sendHtmlMessage("****************************************");
+                log.info("[AKD-OZET-JOB] Piyasa kurumsal özet gönderildi");
             } else {
                 log.debug("[AKD-OZET-JOB] Mesaj oluşturulamadı (veri yok)");
             }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            log.warn("[AKD-OZET-JOB] İş parçacığı kesildi");
         } catch (Exception e) {
             log.error("[AKD-OZET-JOB] Hata: {}", e.getMessage(), e);
         }
+    }
+
+    /**
+     * AKD listesinden infografik kart verisi oluşturur.
+     *
+     * <p>Aynı filtreleme mantığını kullanır: netVolume > 0 alıcı,
+     * netVolume < 0 satıcı olarak ayrılır, her biri en fazla 5 kurum.</p>
+     *
+     * @param response AKD listesi response DTO'su
+     * @return kart verisi, veri yoksa {@code null}
+     */
+    private AkdSummaryCardData buildCardData(BrokerageAkdListResponseDto response) {
+        if (response == null || response.getItems() == null || response.getItems().isEmpty()) {
+            return null;
+        }
+
+        List<BrokerageAkdItemDto> items = response.getItems();
+
+        List<AkdSummaryCardData.BrokerageItem> topBuyers = items.stream()
+                .filter(i -> i.getNetVolume() > 0)
+                .sorted(Comparator.comparingLong(BrokerageAkdItemDto::getNetVolume).reversed())
+                .limit(TOP_COUNT)
+                .map(i -> AkdSummaryCardData.BrokerageItem.builder()
+                        .name(i.getShortTitle())
+                        .volume(TelegramVolumeFormatter.formatVolumeTurkish(i.getNetVolume()))
+                        .build())
+                .toList();
+
+        List<AkdSummaryCardData.BrokerageItem> topSellers = items.stream()
+                .filter(i -> i.getNetVolume() < 0)
+                .sorted(Comparator.comparingLong(BrokerageAkdItemDto::getNetVolume))
+                .limit(TOP_COUNT)
+                .map(i -> AkdSummaryCardData.BrokerageItem.builder()
+                        .name(i.getShortTitle())
+                        .volume(TelegramVolumeFormatter.formatVolumeTurkish(Math.abs(i.getNetVolume())))
+                        .build())
+                .toList();
+
+        if (topBuyers.isEmpty() && topSellers.isEmpty()) {
+            return null;
+        }
+
+        long buyerCount = items.stream().filter(i -> i.getNetVolume() > 0).count();
+        long sellerCount = items.stream().filter(i -> i.getNetVolume() < 0).count();
+
+        return AkdSummaryCardData.builder()
+                .timestamp(LocalTime.now().format(TIME_FMT))
+                .topBuyers(topBuyers)
+                .topSellers(topSellers)
+                .buyerCount(buyerCount)
+                .sellerCount(sellerCount)
+                .build();
     }
 }

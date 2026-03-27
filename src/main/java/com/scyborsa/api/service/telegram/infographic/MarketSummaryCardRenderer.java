@@ -250,7 +250,7 @@ public class MarketSummaryCardRenderer {
     /**
      * Tek bir hisse satırını çizer.
      *
-     * <p>Format: "N. TICKER    +X.XX%    X.XX TL    90.6 Bin"</p>
+     * <p>Format: "N. TICKER    +X.XX%    X.XX₺    90.6 Bin"</p>
      * <p>4 sütun: ticker (sol), değişim (~%40 sağa hizalı),
      * fiyat (~%65 sağa hizalı), hacim (en sağ, küçük font).</p>
      *
