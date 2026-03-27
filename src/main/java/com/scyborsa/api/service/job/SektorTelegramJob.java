@@ -103,7 +103,7 @@ public class SektorTelegramJob {
                     if (cardData != null) {
                         byte[] png = cardRenderer.renderCard(cardData);
                         if (png != null) {
-                            sent = telegramClient.sendPhoto(png, "");
+                            sent = telegramClient.sendPhoto(png, "\uD83D\uDCCA <b>BIST Sekt\u00f6r \u00d6zeti</b> | ScyBorsa Bot");
                             if (sent) {
                                 log.info("[SEKTOR-JOB] İnfografik kart gönderildi ({} KB)",
                                         png.length / 1024);

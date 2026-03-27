@@ -99,7 +99,7 @@ public class AkdPiyasaOzetiJob {
                     if (cardData != null) {
                         byte[] png = cardRenderer.renderCard(cardData);
                         if (png != null) {
-                            sent = telegramClient.sendPhoto(png, "");
+                            sent = telegramClient.sendPhoto(png, "\uD83C\uDFE6 <b>Piyasa Kurumsal \u00d6zet</b> | ScyBorsa Bot");
                             if (sent) {
                                 log.info("[AKD-OZET-JOB] İnfografik kart gönderildi ({} KB)",
                                         png.length / 1024);

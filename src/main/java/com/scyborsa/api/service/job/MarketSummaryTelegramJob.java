@@ -140,7 +140,7 @@ public class MarketSummaryTelegramJob {
                     if (cardData != null) {
                         byte[] png = cardRenderer.renderCard(cardData);
                         if (png != null) {
-                            sent = telegramClient.sendPhoto(png, "");
+                            sent = telegramClient.sendPhoto(png, "\uD83D\uDCCA <b>BIST Piyasa \u00d6zeti</b> | ScyBorsa Bot");
                             if (sent) {
                                 log.info("[MARKET-SUMMARY-JOB] Infografik kart gonderildi ({} KB)",
                                         png.length / 1024);
