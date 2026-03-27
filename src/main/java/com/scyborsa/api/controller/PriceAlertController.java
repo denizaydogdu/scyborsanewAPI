@@ -134,6 +134,18 @@ public class PriceAlertController {
     }
 
     /**
+     * Tum kullanicilarin alarmlarini listeler (admin panel icin).
+     *
+     * @param status opsiyonel durum filtresi (ACTIVE, TRIGGERED, CANCELLED, EXPIRED)
+     * @return tum kullanicilarin alarm DTO listesi
+     */
+    @GetMapping("/admin/all")
+    public ResponseEntity<List<PriceAlertDto>> getAllAlerts(@RequestParam(required = false) String status) {
+        List<PriceAlertDto> alerts = priceAlertService.getAllAlerts(status);
+        return ResponseEntity.ok(alerts);
+    }
+
+    /**
      * Email adresinden kullanici ID'sini cikarir.
      *
      * @param email kullanici email adresi

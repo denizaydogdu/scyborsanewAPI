@@ -299,6 +299,33 @@ public class PriceAlertService {
         return toDto(saved);
     }
 
+    /**
+     * Tum kullanicilarin alarmlarini getirir, opsiyonel durum filtresi ile (admin panel icin).
+     *
+     * @param status alarm durumu filtresi (null ise tum alarmlar)
+     * @return alarm DTO listesi
+     */
+    @Transactional(readOnly = true)
+    public List<PriceAlertDto> getAllAlerts(String status) {
+        List<PriceAlert> alerts;
+
+        if (status != null && !status.isBlank()) {
+            try {
+                AlertStatus alertStatus = AlertStatus.valueOf(status.toUpperCase());
+                alerts = alertRepository.findByStatusOrderByCreateTimeDesc(alertStatus);
+            } catch (IllegalArgumentException e) {
+                log.warn("Gecersiz alarm durumu filtresi: {}", status);
+                alerts = alertRepository.findAllByOrderByCreateTimeDesc();
+            }
+        } else {
+            alerts = alertRepository.findAllByOrderByCreateTimeDesc();
+        }
+
+        return alerts.stream()
+                .map(this::toDto)
+                .toList();
+    }
+
     // ==================== PRIVATE HELPERS ====================
 
     /**
@@ -322,6 +349,7 @@ public class PriceAlertService {
                 .readAt(alert.getReadAt())
                 .note(alert.getNote())
                 .createTime(alert.getCreateTime())
+                .userEmail(alert.getUserEmail())
                 .build();
     }
 

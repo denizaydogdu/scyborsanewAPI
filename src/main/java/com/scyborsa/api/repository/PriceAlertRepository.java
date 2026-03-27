@@ -100,4 +100,19 @@ public interface PriceAlertRepository extends JpaRepository<PriceAlert, Long> {
     @Transactional
     @Query("UPDATE PriceAlert a SET a.readAt = :readAt WHERE a.user.id = :userId AND a.status = :status AND a.readAt IS NULL")
     int markAllRead(@Param("userId") Long userId, @Param("readAt") LocalDateTime readAt, @Param("status") AlertStatus status);
+
+    /**
+     * Tum alarmlari olusturma zamanina gore azalan sirada getirir (admin panel icin).
+     *
+     * @return tum alarm listesi
+     */
+    List<PriceAlert> findAllByOrderByCreateTimeDesc();
+
+    /**
+     * Belirtilen durumdaki tum alarmlari olusturma zamanina gore azalan sirada getirir (admin panel icin).
+     *
+     * @param status alarm durumu filtresi
+     * @return filtrelenmis alarm listesi
+     */
+    List<PriceAlert> findByStatusOrderByCreateTimeDesc(AlertStatus status);
 }
