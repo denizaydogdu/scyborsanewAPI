@@ -180,7 +180,7 @@ public class WatchlistController {
             throw new RuntimeException("Email parametresi zorunludur");
         }
         return appUserRepository.findByEmail(email.trim().toLowerCase())
-                .orElseThrow(() -> new RuntimeException("Kullanici bulunamadi: " + email))
+                .orElseThrow(() -> new RuntimeException("Kullanıcı bulunamadı"))
                 .getId();
     }
 

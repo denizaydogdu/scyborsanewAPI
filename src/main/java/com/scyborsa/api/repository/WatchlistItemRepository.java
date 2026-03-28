@@ -52,7 +52,7 @@ public interface WatchlistItemRepository extends JpaRepository<WatchlistItem, Lo
      * @param watchlistId takip listesi ID'si
      * @param stockCode   silinecek hisse kodu
      */
-    @Modifying
+    @Modifying(clearAutomatically = true)
     @Transactional
     void deleteByWatchlistIdAndStockCode(Long watchlistId, String stockCode);
 
@@ -90,10 +90,10 @@ public interface WatchlistItemRepository extends JpaRepository<WatchlistItem, Lo
      * Belirtilen hisse kodunun, belirtilen kullanicinin baska aktif takip listelerinde olup olmadigini kontrol eder.
      *
      * @param stockCode          hisse kodu
-     * @param userEmail          kullanici email adresi
+     * @param userId             kullanici ID'si
      * @param excludeWatchlistId haric tutulacak takip listesi ID'si
      * @return baska aktif listede mevcutsa {@code true}
      */
-    @Query("SELECT COUNT(wi) > 0 FROM WatchlistItem wi JOIN wi.watchlist w WHERE wi.stockCode = :stockCode AND w.userEmail = :userEmail AND w.aktif = true AND w.id <> :excludeWatchlistId")
-    boolean existsByStockCodeInOtherActiveWatchlists(@Param("stockCode") String stockCode, @Param("userEmail") String userEmail, @Param("excludeWatchlistId") Long excludeWatchlistId);
+    @Query("SELECT COUNT(wi) > 0 FROM WatchlistItem wi JOIN wi.watchlist w WHERE wi.stockCode = :stockCode AND w.user.id = :userId AND w.aktif = true AND w.id <> :excludeWatchlistId")
+    boolean existsByStockCodeInOtherActiveWatchlists(@Param("stockCode") String stockCode, @Param("userId") Long userId, @Param("excludeWatchlistId") Long excludeWatchlistId);
 }

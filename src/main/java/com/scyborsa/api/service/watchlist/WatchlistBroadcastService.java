@@ -2,6 +2,7 @@ package com.scyborsa.api.service.watchlist;
 
 import com.scyborsa.api.dto.watchlist.WatchlistPriceUpdateDto;
 import com.scyborsa.api.repository.WatchlistItemRepository;
+import com.scyborsa.api.utils.BistTradingCalendar;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -90,7 +91,11 @@ public class WatchlistBroadcastService {
                     stockToUsers.size(), userToStocks.size());
 
             // Takip listesindeki hisseleri TradingView WebSocket'e subscribe et
-            subscribeAllActiveStocks();
+            if (BistTradingCalendar.isMarketOpen()) {
+                subscribeAllActiveStocks();
+            } else {
+                log.info("[WATCHLIST-BROADCAST] Seans kapalı — TradingView subscribe ertelendi, seans açılışında yapılacak");
+            }
         } catch (Exception e) {
             log.error("[WATCHLIST-BROADCAST] Init hatasi", e);
             initialized = true; // Hata olsa da servisi baslatarak yeni eklemelere izin ver

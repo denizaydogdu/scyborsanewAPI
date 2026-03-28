@@ -229,12 +229,12 @@ public class WatchlistService {
 
         // Broadcast aboneliklerini kaldir — sadece baska aktif listede olmayan hisseler icin
         if (broadcastService != null && watchlist.getItems() != null) {
-            String userEmail = watchlist.getUserEmail();
+            Long ownerId = watchlist.getUser().getId();
             for (WatchlistItem item : watchlist.getItems()) {
                 boolean existsElsewhere = watchlistItemRepository.existsByStockCodeInOtherActiveWatchlists(
-                        item.getStockCode(), userEmail, watchlistId);
+                        item.getStockCode(), ownerId, watchlistId);
                 if (!existsElsewhere) {
-                    broadcastService.removeSubscription(item.getStockCode(), userEmail);
+                    broadcastService.removeSubscription(item.getStockCode(), watchlist.getUserEmail());
                 }
             }
         }
@@ -358,7 +358,7 @@ public class WatchlistService {
         // Broadcast aboneligini kaldir — sadece baska aktif listede olmayan hisseler icin
         if (broadcastService != null) {
             boolean existsElsewhere = watchlistItemRepository.existsByStockCodeInOtherActiveWatchlists(
-                    normalizedCode, watchlist.getUserEmail(), watchlistId);
+                    normalizedCode, watchlist.getUser().getId(), watchlistId);
             if (!existsElsewhere) {
                 broadcastService.removeSubscription(normalizedCode, watchlist.getUserEmail());
             }
@@ -496,16 +496,4 @@ public class WatchlistService {
         }
     }
 
-    /**
-     * Kullanici ID'sinden email adresini cozumler.
-     *
-     * @param userId kullanici ID'si
-     * @return kullanici email adresi
-     * @throws RuntimeException kullanici bulunamazsa
-     */
-    private String resolveUserEmail(Long userId) {
-        return userRepository.findById(userId)
-                .map(AppUser::getEmail)
-                .orElseThrow(() -> new RuntimeException("Kullanici bulunamadi: " + userId));
-    }
 }
