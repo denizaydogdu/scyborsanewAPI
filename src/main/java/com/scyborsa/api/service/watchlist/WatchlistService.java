@@ -348,7 +348,16 @@ public class WatchlistService {
             broadcastService.addSubscription(stockCode, watchlist.getUserEmail());
         }
 
-        return enrichWithLivePrice(toStockDto(saved));
+        WatchlistStockDto dto = enrichWithLivePrice(toStockDto(saved));
+
+        // Seans kapalıysa Scanner fallback ile fiyat çek
+        if (dto.getLastPrice() == null) {
+            List<WatchlistStockDto> singleList = new java.util.ArrayList<>();
+            singleList.add(dto);
+            enrichWithScannerFallback(singleList);
+        }
+
+        return dto;
     }
 
     /**
