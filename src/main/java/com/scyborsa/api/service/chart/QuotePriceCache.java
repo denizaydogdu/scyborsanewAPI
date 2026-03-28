@@ -29,6 +29,11 @@ public class QuotePriceCache {
     @org.springframework.context.annotation.Lazy
     private PriceAlertEngine alertEngine;
 
+    /** Takip listesi broadcast servisi — mevcut degilse null (graceful degradation). */
+    @Autowired(required = false)
+    @org.springframework.context.annotation.Lazy
+    private com.scyborsa.api.service.watchlist.WatchlistBroadcastService watchlistBroadcastService;
+
     /** Sembol bazinda fiyat kotasyonlarinin tutuldugu thread-safe cache. */
     private final ConcurrentHashMap<String, QuoteEntry> quotes = new ConcurrentHashMap<>();
 
@@ -60,6 +65,16 @@ public class QuotePriceCache {
             if (lp instanceof Number) {
                 String stockCode = symbol.replace("BIST:", "");
                 alertEngine.checkPrice(stockCode, ((Number) lp).doubleValue());
+            }
+        }
+
+        // Watchlist broadcast
+        if (watchlistBroadcastService != null) {
+            try {
+                String wlStockCode = symbol.replace("BIST:", "");
+                watchlistBroadcastService.onQuoteUpdate(wlStockCode, qsdData);
+            } catch (Exception e) {
+                // Watchlist broadcast hatasi quote cache'i etkilememeli
             }
         }
     }

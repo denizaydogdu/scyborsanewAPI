@@ -58,6 +58,11 @@ public class TradingViewBarService {
     @org.springframework.context.annotation.Lazy
     private com.scyborsa.api.service.alert.PriceAlertEngine priceAlertEngine;
 
+    /** Takip listesi broadcast servisi — reconnect sonrasi watchlist hisselerini yeniden subscribe etmek icin. */
+    @Autowired(required = false)
+    @org.springframework.context.annotation.Lazy
+    private com.scyborsa.api.service.watchlist.WatchlistBroadcastService watchlistBroadcastService;
+
     /** Seans açık→kapalı geçişini tespit etmek için önceki durum. */
     private volatile boolean marketWasOpen = false;
 
@@ -288,6 +293,7 @@ public class TradingViewBarService {
                         if (client.isConnected()) {
                             resubscribeAll();
                             resubscribeAlarmQuotes();
+                            resubscribeWatchlistQuotes();
                         }
                     } catch (InterruptedException e) {
                         Thread.currentThread().interrupt();
@@ -338,6 +344,26 @@ public class TradingViewBarService {
             String oldSession = sub.getChartSessionId();
             barCache.removeBySessionId(oldSession);
             client.subscribeToBar(sub.getSymbol(), sub.getPeriod(), sub.getRequestedBars());
+        }
+    }
+
+    /**
+     * Takip listesi hisselerini TradingView'e yeniden abone eder.
+     */
+    private void resubscribeWatchlistQuotes() {
+        if (watchlistBroadcastService == null) {
+            return;
+        }
+        Set<String> watchlistStocks = watchlistBroadcastService.getActiveStockCodes();
+        for (String stockCode : watchlistStocks) {
+            try {
+                subscribeQuote("BIST:" + stockCode);
+            } catch (Exception e) {
+                log.warn("[BAR-SERVICE] Watchlist quote re-subscribe basarisiz: {}", stockCode);
+            }
+        }
+        if (!watchlistStocks.isEmpty()) {
+            log.info("[BAR-SERVICE] {} watchlist hissesi WS re-subscribe edildi", watchlistStocks.size());
         }
     }
 
@@ -495,6 +521,7 @@ public class TradingViewBarService {
                     connect();
                 }
                 resubscribeAlarmQuotes();
+                resubscribeWatchlistQuotes();
             }
             marketWasOpen = true;
             return;
