@@ -1,5 +1,8 @@
 package com.scyborsa.api.service.watchlist;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.scyborsa.api.dto.screener.ScanBodyDefinition;
+import com.scyborsa.api.dto.screener.TvScreenerResponse;
 import com.scyborsa.api.dto.watchlist.*;
 import com.scyborsa.api.model.AppUser;
 import com.scyborsa.api.model.Watchlist;
@@ -8,6 +11,7 @@ import com.scyborsa.api.repository.AppUserRepository;
 import com.scyborsa.api.repository.WatchlistItemRepository;
 import com.scyborsa.api.repository.WatchlistRepository;
 import com.scyborsa.api.service.chart.QuotePriceCache;
+import com.scyborsa.api.service.screener.TradingViewScreenerClient;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -60,6 +64,14 @@ public class WatchlistService {
     /** Broadcast servisi — mevcut degilse null (graceful degradation). */
     @Autowired(required = false)
     private WatchlistBroadcastService broadcastService;
+
+    /** TradingView Scanner API client — mevcut degilse null (graceful degradation). */
+    @Autowired(required = false)
+    private TradingViewScreenerClient screenerClient;
+
+    /** JSON islemleri icin ObjectMapper. */
+    @Autowired
+    private ObjectMapper objectMapper;
 
     // ==================== WATCHLIST CRUD ====================
 
@@ -268,10 +280,12 @@ public class WatchlistService {
 
         List<WatchlistItem> items = watchlistItemRepository.findByWatchlistIdOrderByDisplayOrderAsc(watchlistId);
 
-        return items.stream()
+        List<WatchlistStockDto> result = items.stream()
                 .map(this::toStockDto)
                 .map(this::enrichWithLivePrice)
-                .toList();
+                .collect(Collectors.toList());
+
+        return enrichWithScannerFallback(result);
     }
 
     /**
@@ -481,6 +495,90 @@ public class WatchlistService {
             log.debug("Fiyat bilgisi alinamadi: stockCode={}, hata={}", dto.getStockCode(), e.getMessage());
         }
         return dto;
+    }
+
+    /**
+     * QuotePriceCache'ten fiyat alinamayan hisseler icin TradingView Scanner API fallback.
+     *
+     * <p>Seans kapali oldugunda QuotePriceCache bos olur ve tum fiyatlar {@code null} kalir.
+     * Bu metot, fiyati olmayan hisseleri tespit edip tek bir TradingView Scanner batch scan ile
+     * son kapanis fiyatlarini ceker.</p>
+     *
+     * @param stocks fiyat zenginlestirmesi yapilmis (veya yapilamamis) hisse listesi
+     * @return Scanner fallback ile zenginlestirilmis hisse listesi
+     */
+    private List<WatchlistStockDto> enrichWithScannerFallback(List<WatchlistStockDto> stocks) {
+        if (screenerClient == null || stocks.isEmpty()) {
+            return stocks;
+        }
+
+        // Fiyati olmayan hisseleri filtrele
+        List<WatchlistStockDto> unenriched = stocks.stream()
+                .filter(s -> s.getLastPrice() == null)
+                .toList();
+
+        if (unenriched.isEmpty()) {
+            return stocks;
+        }
+
+        try {
+            // Ticker listesi olustur: "BIST:THYAO","BIST:GARAN"
+            List<String> tickers = unenriched.stream()
+                    .map(s -> "BIST:" + s.getStockCode())
+                    .toList();
+
+            String tickersJson = objectMapper.writeValueAsString(tickers);
+
+            String scanBodyJson = """
+                    {
+                      "columns": ["close", "change", "change_abs", "logoid"],
+                      "symbols": {"tickers": %s},
+                      "options": {"lang": "tr"},
+                      "range": [0, %d]
+                    }
+                    """.formatted(tickersJson, unenriched.size());
+
+            ScanBodyDefinition scanBody = new ScanBodyDefinition("WATCHLIST_FALLBACK", scanBodyJson);
+            TvScreenerResponse response = screenerClient.executeScan(scanBody);
+
+            if (response == null || response.getData() == null || response.getData().isEmpty()) {
+                return stocks;
+            }
+
+            // Ticker -> DTO map olustur (hizli eslestirme icin)
+            Map<String, WatchlistStockDto> stockMap = unenriched.stream()
+                    .collect(Collectors.toMap(WatchlistStockDto::getStockCode, s -> s));
+
+            for (TvScreenerResponse.DataItem item : response.getData()) {
+                if (item.getS() == null || item.getD() == null) continue;
+
+                String stockCode = item.getS().replace("BIST:", "");
+                WatchlistStockDto dto = stockMap.get(stockCode);
+                if (dto == null) continue;
+
+                List<Object> d = item.getD();
+
+                // d[0] = close (lastPrice)
+                if (d.size() > 0 && d.get(0) instanceof Number) {
+                    dto.setLastPrice(((Number) d.get(0)).doubleValue());
+                }
+                // d[1] = change (changePercent)
+                if (d.size() > 1 && d.get(1) instanceof Number) {
+                    dto.setChangePercent(((Number) d.get(1)).doubleValue());
+                }
+                // d[2] = change_abs (change absolute)
+                if (d.size() > 2 && d.get(2) instanceof Number) {
+                    dto.setChange(((Number) d.get(2)).doubleValue());
+                }
+            }
+
+            log.info("[WATCHLIST] Scanner fallback: {} hisse icin fiyat cekildi", response.getData().size());
+
+        } catch (Exception e) {
+            log.warn("[WATCHLIST] Scanner fallback basarisiz: {}", e.getMessage());
+        }
+
+        return stocks;
     }
 
     /**
