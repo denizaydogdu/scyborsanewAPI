@@ -54,7 +54,7 @@ public enum PresetStrategyEnum {
     ADX_STRONG_TREND("adx_strong_trend", "Güçlü ADX Trendi", "ADX 25 üstünde ve +DI > -DI olan hisseler", "TREND"),
 
     /** SMA50 > SMA200 — altin capraz. */
-    SMA_ABOVE_ORDER("sma_above_order", "SMA Altın Çapraz", "SMA50 > SMA200 olan hisseler (altın çapraz)", "TREND"),
+    SMA_ABOVE_ORDER("sma_above_order", "SMA Sıralaması (SMA50 > SMA200)", "SMA50 > SMA200 olan hisseler", "TREND"),
 
     /** SMA50 < SMA200 — olum caprazi. */
     SMA_BELOW_ORDER("sma_below_order", "SMA Ölüm Çaprazı", "SMA50 < SMA200 olan hisseler (ölüm çaprazı)", "TREND"),
@@ -63,7 +63,7 @@ public enum PresetStrategyEnum {
     PARABOLIC_SAR_ABOVE("parabolic_sar_above", "Parabolic SAR Üstünde", "Fiyat Parabolic SAR üstünde olan hisseler", "TREND"),
 
     /** Fiyat Ichimoku bulutu ustunde. */
-    ICHIMOKU_ABOVE_CLOUD("ichimoku_above_cloud", "Ichimoku Bulut Üstü", "Fiyat Ichimoku bulutu üstünde olan hisseler", "TREND"),
+    ICHIMOKU_ABOVE_CLOUD("ichimoku_above_cloud", "Ichimoku Bulut Üzerinde", "Fiyat Ichimoku bulutu üzerinde olan hisseler", "TREND"),
 
     // ==================== HACIM (3) ====================
 
@@ -79,7 +79,7 @@ public enum PresetStrategyEnum {
     // ==================== VOLATILITE (2) ====================
 
     /** Bollinger Band sikismasi — dusuk volatilite. */
-    BB_SQUEEZE("bb_squeeze", "Bollinger Sıkışması", "Bollinger Band genişliği %4 altında olan hisseler", "VOLATILITE"),
+    BB_SQUEEZE("bb_squeeze", "Bollinger Band Daralması", "Bollinger Band genişliği %4 altında olan hisseler", "VOLATILITE"),
 
     /** Dusuk volatilite — gunluk volatilite %2 altinda. */
     LOW_VOLATILITY("low_volatility", "Düşük Volatilite", "Günlük volatilite %2 altında olan hisseler", "VOLATILITE"),
