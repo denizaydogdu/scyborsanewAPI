@@ -1,10 +1,7 @@
 package com.scyborsa.api.model;
 
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.*;
 
 import java.time.LocalDateTime;
 
@@ -20,7 +17,10 @@ import java.time.LocalDateTime;
  * @see Watchlist
  * @see com.scyborsa.api.repository.WatchlistItemRepository
  */
-@Data
+@Getter
+@Setter
+@ToString(exclude = "watchlist")
+@EqualsAndHashCode(of = "id")
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor

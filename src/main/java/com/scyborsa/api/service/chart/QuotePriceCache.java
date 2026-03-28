@@ -61,10 +61,14 @@ public class QuotePriceCache {
 
         // Fiyat alarm motoru kontrolu
         if (alertEngine != null) {
-            Object lp = qsdData.get("lp");
-            if (lp instanceof Number) {
-                String stockCode = symbol.replace("BIST:", "");
-                alertEngine.checkPrice(stockCode, ((Number) lp).doubleValue());
+            try {
+                Object lp = qsdData.get("lp");
+                if (lp instanceof Number) {
+                    String stockCode = symbol.replace("BIST:", "");
+                    alertEngine.checkPrice(stockCode, ((Number) lp).doubleValue());
+                }
+            } catch (Exception e) {
+                // Alert engine hatasi quote cache'i etkilememeli
             }
         }
 

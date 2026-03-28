@@ -97,14 +97,12 @@ public class WatchlistService {
         return watchlistRepository.findByUserIdAndIsDefaultTrueAndAktifTrue(userId)
                 .map(this::toWatchlistDto)
                 .orElseGet(() -> {
-                    String userEmail = resolveUserEmail(userId);
-
                     AppUser user = userRepository.findById(userId)
                             .orElseThrow(() -> new RuntimeException("Kullanici bulunamadi: " + userId));
 
                     Watchlist watchlist = Watchlist.builder()
                             .user(user)
-                            .userEmail(userEmail)
+                            .userEmail(user.getEmail())
                             .name(DEFAULT_WATCHLIST_NAME)
                             .isDefault(true)
                             .displayOrder(0)
@@ -357,9 +355,13 @@ public class WatchlistService {
         String normalizedCode = stockCode.trim().toUpperCase();
         watchlistItemRepository.deleteByWatchlistIdAndStockCode(watchlistId, normalizedCode);
 
-        // Broadcast aboneligini kaldir
+        // Broadcast aboneligini kaldir — sadece baska aktif listede olmayan hisseler icin
         if (broadcastService != null) {
-            broadcastService.removeSubscription(normalizedCode, watchlist.getUserEmail());
+            boolean existsElsewhere = watchlistItemRepository.existsByStockCodeInOtherActiveWatchlists(
+                    normalizedCode, watchlist.getUserEmail(), watchlistId);
+            if (!existsElsewhere) {
+                broadcastService.removeSubscription(normalizedCode, watchlist.getUserEmail());
+            }
         }
 
         log.info("Hisse takip listesinden cikarildi: userId={}, watchlistId={}, stockCode={}",
@@ -391,6 +393,10 @@ public class WatchlistService {
             if (!validIds.contains(itemId)) {
                 throw new RuntimeException("Gecersiz siralama: Oge bu takip listesine ait degil (id=" + itemId + ")");
             }
+        }
+
+        if (req.getItemIds().size() != items.size()) {
+            throw new RuntimeException("Sıralama listesi tam olmalı: beklenen " + items.size() + ", gelen " + req.getItemIds().size());
         }
 
         List<Long> itemIds = req.getItemIds();
