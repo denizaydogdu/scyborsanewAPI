@@ -570,6 +570,10 @@ public class WatchlistService {
                 if (d.size() > 2 && d.get(2) instanceof Number) {
                     dto.setChange(((Number) d.get(2)).doubleValue());
                 }
+                // d[3] = logoid
+                if (d.size() > 3 && d.get(3) instanceof String) {
+                    dto.setLogoid((String) d.get(3));
+                }
             }
 
             log.info("[WATCHLIST] Scanner fallback: {} hisse icin fiyat cekildi", response.getData().size());

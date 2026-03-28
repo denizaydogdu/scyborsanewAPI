@@ -43,4 +43,7 @@ public class WatchlistStockDto {
 
     /** Islem hacmi (sorgu zamaninda zenginlestirilir). */
     private Double volume;
+
+    /** Hisse logo ID'si (TradingView logoid, sorgu zamaninda zenginlestirilir). */
+    private String logoid;
 }
