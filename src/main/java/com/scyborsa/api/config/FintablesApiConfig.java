@@ -48,6 +48,9 @@ public class FintablesApiConfig {
     /** Fintables API cookie (auth-token + tracking). */
     private String cookie;
 
+    /** Takas liste endpoint'i icin auth-token (fintables.com RSC). */
+    private String takasListToken;
+
     /** HTTP client baglanti zaman asimi (saniye). */
     private int connectTimeoutSeconds = 10;
 

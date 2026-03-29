@@ -5,8 +5,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.scyborsa.api.config.TradingViewConfig;
 import com.scyborsa.api.dto.sector.SectorStockDto;
 import com.scyborsa.api.service.KatilimEndeksiService;
+import com.scyborsa.api.utils.BistCacheUtils;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.net.URI;
@@ -26,7 +26,7 @@ import java.util.concurrent.ConcurrentHashMap;
  *
  * <p>TradingView Scanner API'sine tek bir HTTP POST istegi gondererek tum BIST
  * hisselerini {@code indexes} column'u ile birlikte ceker. Sonuclar volatile
- * cache ile saklanir (varsayilan TTL: 120 saniye). Her endeks icin
+ * cache ile saklanir (seans ici 60 saniye, seans disi bir sonraki seans acilisina kadar). Her endeks icin
  * (BIST 100, BIST 50, BIST 30) ayri filtreleme uygulanir.</p>
  *
  * <p>TradingView Scanner API'de {@code indexes} alani yalnizca column olarak
@@ -75,9 +75,11 @@ public class Bist100Service {
     /** Cache yenileme kilit nesnesi. */
     private final Object cacheLock = new Object();
 
-    /** Cache TTL (saniye cinsinden). */
-    @Value("${bist100.cache.ttl-seconds:120}")
-    private int cacheTtlSeconds;
+    /** Seans ici cache TTL (milisaniye): 60 saniye. */
+    private static final long LIVE_TTL_MS = 60_000L;
+
+    /** Seans disi minimum cache TTL (milisaniye): 1 saat. Gercek TTL bir sonraki seans acilisina kadar hesaplanir. */
+    private static final long MIN_OFFHOURS_TTL_MS = 3_600_000L;
 
     /**
      * Constructor injection ile bagimliliklari alir ve HTTP client olusturur.
@@ -170,15 +172,17 @@ public class Bist100Service {
      * es zamanli fetch'i onler.</p>
      */
     private void ensureCacheLoaded() {
+        long ttl = BistCacheUtils.getDynamicOffhoursTTL(LIVE_TTL_MS, MIN_OFFHOURS_TTL_MS);
         long now = System.currentTimeMillis();
-        if (cachedAllStocks != null && (now - cacheTimestamp) < (long) cacheTtlSeconds * 1000) {
+        if (cachedAllStocks != null && (now - cacheTimestamp) < ttl) {
             return;
         }
 
         synchronized (cacheLock) {
             // Double-check: baska thread araya girip cache'i guncellemis olabilir
+            ttl = BistCacheUtils.getDynamicOffhoursTTL(LIVE_TTL_MS, MIN_OFFHOURS_TTL_MS);
             now = System.currentTimeMillis();
-            if (cachedAllStocks != null && (now - cacheTimestamp) < (long) cacheTtlSeconds * 1000) {
+            if (cachedAllStocks != null && (now - cacheTimestamp) < ttl) {
                 return;
             }
 
@@ -187,6 +191,16 @@ public class Bist100Service {
 
             if (stocks.isEmpty()) {
                 log.warn("[BIST-INDEX] TradingView taramasi bos sonuc dondurdu");
+                long currentTtl = BistCacheUtils.getDynamicOffhoursTTL(LIVE_TTL_MS, MIN_OFFHOURS_TTL_MS);
+                if (cachedAllStocks != null) {
+                    // Mevcut cache var — tam TTL backoff (retry storm engeli)
+                    this.cacheTimestamp = System.currentTimeMillis();
+                    log.warn("[BIST-INDEX] Mevcut cache korunuyor. TTL sonrasi yeniden denenecek.");
+                } else {
+                    // Soguk baslatma hatasi — 30 saniye sonra yeniden dene
+                    this.cacheTimestamp = System.currentTimeMillis() - currentTtl + 30_000L;
+                    log.warn("[BIST-INDEX] Soguk baslatmada bos sonuc, 30 saniye sonra yeniden denenecek.");
+                }
                 return;
             }
 

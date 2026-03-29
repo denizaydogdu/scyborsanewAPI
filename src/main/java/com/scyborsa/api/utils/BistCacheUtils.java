@@ -70,6 +70,68 @@ public final class BistCacheUtils {
     }
 
     /**
+     * Seans durumuna gore dinamik cache TTL hesaplar.
+     *
+     * <p>Seans ici: {@code liveTtlMs} doner. Seans disi: bir sonraki islem gununun
+     * 09:50'sine kadar kalan sureyi hesaplar (minimum {@code minOffhoursTtlMs}).
+     * Boylece Cuma 18:30'da cache dolunca Pazartesi 09:50'ye kadar tek cache'te kalir.
+     * Seans oncesi (00:00-09:50) dalinda minimum uygulanmaz — tam 09:50'de expire olur.</p>
+     *
+     * @param liveTtlMs        seans ici TTL (milisaniye)
+     * @param minOffhoursTtlMs minimum seans disi TTL (milisaniye, guvenlik alt siniri)
+     * @return hesaplanan TTL (milisaniye)
+     */
+    public static long getDynamicOffhoursTTL(long liveTtlMs, long minOffhoursTtlMs) {
+        LocalDate today = LocalDate.now(ISTANBUL_ZONE);
+        LocalTime now = LocalTime.now(ISTANBUL_ZONE);
+
+        // Tatil / Hafta sonu
+        if (SessionHolidays.isNonTradingDay(today)) {
+            return msUntilNextSessionOpen(today, now, minOffhoursTtlMs);
+        }
+
+        // Yarim gun kapanisi gectiyse
+        LocalTime halfClose = SessionHolidays.getHalfDayClosingTime(today);
+        if (halfClose != null && now.isAfter(halfClose.plusMinutes(10))) {
+            return msUntilNextSessionOpen(today, now, minOffhoursTtlMs);
+        }
+
+        // Seans oncesi (00:00-09:50)
+        if (now.isBefore(LocalTime.of(9, 50))) {
+            // Bugun seans gunu — tam 09:50'de expire olsun, seans icine tasmaz
+            long msUntil = java.time.Duration.between(now, LocalTime.of(9, 50)).toMillis();
+            return msUntil;
+        }
+
+        // Seans sonrasi (18:25+)
+        if (now.isAfter(LocalTime.of(18, 25))) {
+            return msUntilNextSessionOpen(today, now, minOffhoursTtlMs);
+        }
+
+        // Seans ici
+        return liveTtlMs;
+    }
+
+    /**
+     * Bir sonraki islem gununun 09:50'sine kadar kalan sureyi hesaplar.
+     *
+     * @param fromDate  baslangic tarihi
+     * @param fromTime  baslangic saati
+     * @param minTtlMs  minimum TTL (milisaniye)
+     * @return kalan sure (milisaniye), minimum {@code minTtlMs}
+     */
+    private static long msUntilNextSessionOpen(LocalDate fromDate, LocalTime fromTime, long minTtlMs) {
+        LocalDate nextTradingDay = SessionHolidays.getNextTradingDay(fromDate);
+        LocalTime targetTime = LocalTime.of(9, 50);
+
+        java.time.LocalDateTime fromDt = java.time.LocalDateTime.of(fromDate, fromTime);
+        java.time.LocalDateTime targetDt = java.time.LocalDateTime.of(nextTradingDay, targetTime);
+
+        long ms = java.time.Duration.between(fromDt, targetDt).toMillis();
+        return Math.max(ms, minTtlMs);
+    }
+
+    /**
      * Tarih parametresini cozumler. Null veya bos ise bugunu veya onceki islem gunununu dondurur.
      *
      * <p>Tatil veya hafta sonu ise geriye dogru en yakin islem gununu bulur

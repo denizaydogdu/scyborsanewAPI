@@ -6,6 +6,7 @@ import com.scyborsa.api.service.client.FintablesApiClient;
 import com.scyborsa.api.dto.analyst.FintablesAnalystRatingResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -60,6 +61,24 @@ public class AnalystRatingService {
         this.fintablesApiClient = fintablesApiClient;
         this.araciKurumService = araciKurumService;
         this.katilimEndeksiService = katilimEndeksiService;
+    }
+
+    /**
+     * Her sabah 09:00'da analist tavsiye cache'ini yeniler.
+     *
+     * <p>Fintables analist tavsiyeleri gunluk guncellenir.
+     * Sabah 09:00'da taze veri cekilir, 24 saat boyunca cache'te tutulur.</p>
+     */
+    @Scheduled(cron = "0 0 9 * * *", zone = "Europe/Istanbul")
+    public void scheduledCacheRefresh() {
+        log.info("[ANALYST-RATING] Gunluk cache yenileme basladi (09:00 scheduled)");
+        try {
+            this.cacheTimestamp = 0;
+            List<AnalystRatingDto> ratings = getAnalystRatings();
+            log.info("[ANALYST-RATING] Gunluk cache yenileme tamamlandi: {} tavsiye", ratings.size());
+        } catch (Exception e) {
+            log.warn("[ANALYST-RATING] Gunluk cache yenileme basarisiz: {}", e.getMessage());
+        }
     }
 
     /**

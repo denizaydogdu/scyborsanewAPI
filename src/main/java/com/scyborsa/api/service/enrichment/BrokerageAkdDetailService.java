@@ -23,8 +23,8 @@ import java.util.stream.Collectors;
  * Araci kurum bazli AKD detay servisi.
  *
  * <p>Fintables API'den belirli bir araci kurumun hisse bazli AKD (Araci Kurum Dagilimi)
- * verisini ceker, donusturur ve adaptif TTL'li ConcurrentHashMap cache ile sunar
- * (seans ici 60s, seans disi/tatil 1 saat).</p>
+ * verisini ceker, donusturur ve dinamik TTL'li ConcurrentHashMap cache ile sunar
+ * (seans ici 60s, seans disi bir sonraki seans acilisina kadar, minimum 1 saat).</p>
  *
  * <p>Cache yapisi: Her araci kurum + tarih kombinasyonu icin ayri cache entry'si tutulur.
  * Farkli araci kurumlar esanli olarak sorgulanabilir.</p>
@@ -49,8 +49,8 @@ public class BrokerageAkdDetailService {
     /** Seans ici cache TTL (milisaniye): 60 saniye. */
     private static final long CACHE_TTL_LIVE_MS = 60_000;
 
-    /** Seans disi cache TTL (milisaniye): 1 saat. */
-    private static final long CACHE_TTL_OFFHOURS_MS = 3_600_000;
+    /** Minimum seans disi cache TTL (milisaniye): 1 saat (guvenlik alt siniri). */
+    private static final long MIN_CACHE_TTL_OFFHOURS_MS = 3_600_000;
 
     /** Maksimum cache entry sayisi. */
     private static final int MAX_CACHE_SIZE = 100;
@@ -61,7 +61,7 @@ public class BrokerageAkdDetailService {
     /**
      * Belirli bir araci kurumun hisse bazli AKD detay verisini getirir.
      *
-     * <p>Adaptif TTL ile ConcurrentHashMap cache kullanir (seans ici 60s, seans disi 1 saat). Cache key'i
+     * <p>Dinamik TTL ile ConcurrentHashMap cache kullanir (seans ici 60s, seans disi bir sonraki seans acilisina kadar). Cache key'i
      * {@code brokerageCode + "_" + resolvedDate} formatindadir.</p>
      *
      * <p>Hata durumunda eski cache varsa onu dondurur, yoksa bos response olusturur.</p>
@@ -76,7 +76,7 @@ public class BrokerageAkdDetailService {
 
         // Cache hit kontrolu
         CachedEntry entry = cache.get(cacheKey);
-        if (entry != null && (System.currentTimeMillis() - entry.timestamp) < BistCacheUtils.getAdaptiveTTL(CACHE_TTL_LIVE_MS, CACHE_TTL_OFFHOURS_MS)) {
+        if (entry != null && (System.currentTimeMillis() - entry.timestamp) < BistCacheUtils.getDynamicOffhoursTTL(CACHE_TTL_LIVE_MS, MIN_CACHE_TTL_OFFHOURS_MS)) {
             return entry.response;
         }
 

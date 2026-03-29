@@ -14,45 +14,45 @@ import java.time.format.DateTimeFormatter;
  * - Dini Bayramlar: Ramazan Bayramı, Kurban Bayramı
  * - Diğer: Yılbaşı, 1 Mayıs, 15 Temmuz
  *
- * Yarım Gün (Arefe): Borsa erken kapanır (genelde 13:00)
+ * Yarım Gün (Arefe): Borsa erken kapanır (12:30)
  */
 public enum SessionHolidays {
 
     // ==================== 2025 TATİLLERİ ====================
-    Time_20250328("20250328", true, LocalTime.of(13, 0)),
+    Time_20250328("20250328", true, LocalTime.of(12, 30)),
     Time_20250330("20250330", false, null),
     Time_20250331("20250331", false, null),
     Time_20250423("20250423", false, null),
     Time_20250501("20250501", false, null),
     Time_20250519("20250519", false, null),
-    Time_20250605("20250605", true, LocalTime.of(13, 0)),
+    Time_20250605("20250605", true, LocalTime.of(12, 30)),
     Time_20250606("20250606", false, null),
     Time_20250607("20250607", false, null),
     Time_20250608("20250608", false, null),
     Time_20250609("20250609", false, null),
     Time_20250715("20250715", false, null),
-    Time_20251028("20251028", true, LocalTime.of(13, 0)),
+    Time_20251028("20251028", true, LocalTime.of(12, 30)),
     Time_20251029("20251029", false, null),
 
     // ==================== 2026 TATİLLERİ ====================
     Time_20260101("20260101", false, null),
-    Time_20260319("20260319", true, LocalTime.of(13, 0)),
+    Time_20260319("20260319", true, LocalTime.of(12, 30)),
     Time_20260320("20260320", false, null),
     Time_20260423("20260423", false, null),
     Time_20260501("20260501", false, null),
     Time_20260519("20260519", false, null),
-    Time_20260526("20260526", true, LocalTime.of(13, 0)),
+    Time_20260526("20260526", true, LocalTime.of(12, 30)),
     Time_20260527("20260527", false, null),
     Time_20260528("20260528", false, null),
     Time_20260529("20260529", false, null),
     Time_20260715("20260715", false, null),
-    Time_20261028("20261028", true, LocalTime.of(13, 0)),
+    Time_20261028("20261028", true, LocalTime.of(12, 30)),
     Time_20261029("20261029", false, null),
-    Time_20261231("20261231", true, LocalTime.of(13, 0)),
+    Time_20261231("20261231", true, LocalTime.of(12, 30)),
 
     // ==================== 2027 TATİLLERİ ====================
     Time_20270101("20270101", false, null),
-    Time_20270308("20270308", true, LocalTime.of(12, 40)),
+    Time_20270308("20270308", true, LocalTime.of(12, 30)),
     Time_20270309("20270309", false, null),
     Time_20270310("20270310", false, null),
     Time_20270311("20270311", false, null),
@@ -62,9 +62,9 @@ public enum SessionHolidays {
     Time_20270519("20270519", false, null),
     Time_20270715("20270715", false, null),
     Time_20270830("20270830", false, null),
-    Time_20271028("20271028", true, LocalTime.of(12, 40)),
+    Time_20271028("20271028", true, LocalTime.of(12, 30)),
     Time_20271029("20271029", false, null),
-    Time_20271231("20271231", true, LocalTime.of(13, 0));
+    Time_20271231("20271231", true, LocalTime.of(12, 30));
 
     /** Tatil tarihi (yyyyMMdd formati, orn. "20250423"). */
     private final String dateStr;

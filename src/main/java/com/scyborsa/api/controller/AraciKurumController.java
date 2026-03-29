@@ -3,9 +3,11 @@ package com.scyborsa.api.controller;
 import com.scyborsa.api.dto.AraciKurumDto;
 import com.scyborsa.api.dto.enrichment.BrokerageAkdDetailResponseDto;
 import com.scyborsa.api.dto.enrichment.BrokerageAkdListResponseDto;
+import com.scyborsa.api.dto.enrichment.BrokerageTakasListResponseDto;
 import com.scyborsa.api.service.AraciKurumService;
 import com.scyborsa.api.service.enrichment.BrokerageAkdDetailService;
 import com.scyborsa.api.service.enrichment.BrokerageAkdListService;
+import com.scyborsa.api.service.enrichment.BrokerageTakasListService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
@@ -22,6 +24,7 @@ import java.util.List;
  * @see AraciKurumService
  * @see BrokerageAkdDetailService
  * @see BrokerageAkdListService
+ * @see BrokerageTakasListService
  */
 @Slf4j
 @RestController
@@ -32,6 +35,7 @@ public class AraciKurumController {
     private final AraciKurumService araciKurumService;
     private final BrokerageAkdDetailService brokerageAkdDetailService;
     private final BrokerageAkdListService brokerageAkdListService;
+    private final BrokerageTakasListService brokerageTakasListService;
 
     /**
      * Aktif araci kurumlari listeler.
@@ -103,6 +107,19 @@ public class AraciKurumController {
         }
 
         return ResponseEntity.ok(brokerageAkdDetailService.getAkdDetail(code, date));
+    }
+
+    /**
+     * Piyasa geneli araci kurum takas (saklama) listesini dondurur.
+     *
+     * <p>HTTP GET {@code /api/v1/araci-kurumlar/takas-list}</p>
+     *
+     * @return takas (saklama) dagilim listesi
+     */
+    @GetMapping("/takas-list")
+    public ResponseEntity<BrokerageTakasListResponseDto> getTakasList() {
+        BrokerageTakasListResponseDto response = brokerageTakasListService.getTakasList();
+        return ResponseEntity.ok(response);
     }
 
     /**

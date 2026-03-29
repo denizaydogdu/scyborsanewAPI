@@ -12,6 +12,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Async;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import java.net.URLEncoder;
@@ -25,8 +26,9 @@ import java.util.Map;
  * TEFAS fon verilerini api.velzon.tr uzerinden saglayan servis.
  *
  * <p>VelzonApiClient kullanarak TEFAS Fund API endpoint'lerini cagirir.
- * Fon listesi volatile cache ile saklanir (varsayilan TTL: 4 saat,
- * double-check locking). Startup'ta {@link #warmUpCache()} ile on-yukleme yapilir.</p>
+ * Fon listesi volatile cache ile saklanir (varsayilan TTL: 24 saat,
+ * double-check locking). Startup'ta {@link #warmUpCache()} ile on-yukleme,
+ * her gece 03:00'te {@link #scheduledCacheRefresh()} ile gunluk yenileme yapilir.</p>
  *
  * <p>api.velzon.tr response formati: {@code {success: true, data: [...], pagination: {...}}}.
  * {@code data} dizisi extract edilip {@link FundDto} listesine donusturulur.</p>
@@ -54,8 +56,8 @@ public class FundService {
     /** Cache kilit nesnesi. */
     private final Object cacheLock = new Object();
 
-    /** Cache TTL (saniye cinsinden, varsayilan 4 saat). */
-    @Value("${fund.cache.ttl-seconds:14400}")
+    /** Cache TTL (saniye cinsinden, varsayilan 24 saat). TEFAS verileri gunluk guncellenir. */
+    @Value("${fund.cache.ttl-seconds:86400}")
     private int cacheTtlSeconds;
 
     /**
@@ -88,10 +90,29 @@ public class FundService {
     }
 
     /**
+     * Her gece 03:00'te fon cache'ini yeniler.
+     *
+     * <p>TEFAS verileri gunluk guncellenir (seans kapanisi sonrasi).
+     * Gece 03:00'te taze veri cekilir, 24 saat boyunca cache'te tutulur.</p>
+     */
+    @Scheduled(cron = "0 0 3 * * *", zone = "Europe/Istanbul")
+    public void scheduledCacheRefresh() {
+        log.info("[FUND] Gunluk cache yenileme basladi (03:00 scheduled)");
+        try {
+            // Cache'i invalidate et — force refresh
+            this.cacheTimestamp = 0;
+            List<FundDto> funds = getAllFunds();
+            log.info("[FUND] Gunluk cache yenileme tamamlandi: {} fon", funds.size());
+        } catch (Exception e) {
+            log.warn("[FUND] Gunluk cache yenileme basarisiz: {}", e.getMessage());
+        }
+    }
+
+    /**
      * Tum aktif fonlari dondurur.
      *
      * <p>api.velzon.tr'deki {@code GET /api/funds?page=0&size=2500&isActive=true}
-     * endpoint'ini cagirir. Sonuclar volatile cache ile saklanir (TTL: 4 saat).</p>
+     * endpoint'ini cagirir. Sonuclar volatile cache ile saklanir (TTL: 24 saat).</p>
      *
      * @return fon listesi; hata durumunda bos liste
      */

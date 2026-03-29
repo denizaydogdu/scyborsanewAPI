@@ -1,6 +1,7 @@
 package com.scyborsa.api.service.market;
 
 import com.scyborsa.api.service.client.VelzonApiClient;
+import com.scyborsa.api.utils.BistCacheUtils;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.scyborsa.api.dto.market.IndexPerformanceDto;
@@ -34,7 +35,9 @@ import java.util.Map;
  *   <li>{@code plot12} → yearlyChange%</li>
  * </ul>
  *
- * <p>Sonuclar volatile cache ile saklanir (varsayilan TTL: 60 saniye).</p>
+ * <p>Sonuclar volatile cache ile saklanir. Dinamik TTL stratejisi: seans
+ * saatlerinde (09:50-18:25) 60 saniye, seans disinda bir sonraki seans acilisina kadar
+ * ({@link BistCacheUtils#getDynamicOffhoursTTL(long, long)}).</p>
  *
  * @see VelzonApiClient
  * @see IndexPerformanceDto
@@ -47,8 +50,11 @@ public class IndexPerformanceService {
     /** Velzon API endpoint path'i. */
     private static final String INDEXES_PERFORMANCE_PATH = "/api/pinescreener/velzon_indexes_performance";
 
-    /** Cache TTL (milisaniye cinsinden): 60 saniye. */
-    private static final long CACHE_TTL_MS = 60_000L;
+    /** Seans ici cache TTL (milisaniye): 60 saniye. */
+    private static final long LIVE_TTL_MS = 60_000L;
+
+    /** Seans disi minimum cache TTL (milisaniye): 30 dakika. Gercek TTL bir sonraki seans acilisina kadar hesaplanir. */
+    private static final long MIN_OFFHOURS_TTL_MS = 1_800_000L;
 
     /** Velzon API istemcisi. */
     private final VelzonApiClient velzonApiClient;
@@ -58,6 +64,9 @@ public class IndexPerformanceService {
 
     /** Cache: son guncelleme zamani (epoch millis). */
     private volatile long cacheTimestamp;
+
+    /** Cache yenileme icin kilit nesnesi. */
+    private final Object cacheLock = new Object();
 
     /**
      * Tum BIST endekslerinin performans verilerini dondurur.
@@ -69,59 +78,71 @@ public class IndexPerformanceService {
      * cikartilir), son fiyat, gunluk/haftalik/aylik/ceyreklik/6 aylik/yillik
      * degisim yuzdesi bilgisi dondurulur.</p>
      *
-     * <p>Sonuclar volatile cache ile saklanir (60s TTL). Cache suresi dolmadan
+     * <p>Sonuclar volatile cache ile saklanir. Dinamik TTL stratejisi:
+     * seans saatlerinde (09:50-18:25) 60s, seans disinda bir sonraki seans acilisina kadar
+     * ({@link BistCacheUtils#getDynamicOffhoursTTL(long, long)}). Cache suresi dolmadan
      * tekrar cagrilirsa cached deger dondurulur.</p>
      *
      * @return endeks performans listesi; hata durumunda bos liste
      */
     public List<IndexPerformanceDto> getIndexPerformances() {
-        // Cache kontrolu
+        // Cache kontrolu (ilk kontrol — lock disinda)
+        long ttl = BistCacheUtils.getDynamicOffhoursTTL(LIVE_TTL_MS, MIN_OFFHOURS_TTL_MS);
         long now = System.currentTimeMillis();
-        if (cachedPerformances != null && (now - cacheTimestamp) < CACHE_TTL_MS) {
+        if (cachedPerformances != null && (now - cacheTimestamp) < ttl) {
             log.debug("[INDEX-PERF] Cache hit, kalan sure: {}s",
-                    (CACHE_TTL_MS - (now - cacheTimestamp)) / 1000);
+                    (ttl - (now - cacheTimestamp)) / 1000);
             return cachedPerformances;
         }
 
-        log.info("[INDEX-PERF] Endeks performans verileri Velzon API'den cekiliyor");
+        synchronized (cacheLock) {
+            // Double-check: baska thread araya girip cache'i guncellemis olabilir
+            ttl = BistCacheUtils.getDynamicOffhoursTTL(LIVE_TTL_MS, MIN_OFFHOURS_TTL_MS);
+            now = System.currentTimeMillis();
+            if (cachedPerformances != null && (now - cacheTimestamp) < ttl) {
+                return cachedPerformances;
+            }
 
-        try {
-            Map<String, Object> response = velzonApiClient.get(
-                    INDEXES_PERFORMANCE_PATH,
-                    new TypeReference<Map<String, Object>>() {}
-            );
+            log.info("[INDEX-PERF] Endeks performans verileri Velzon API'den cekiliyor (TTL: {}ms)", ttl);
 
-            // Data dizisini parse et
-            Object rawData = response.get("data");
-            if (!(rawData instanceof List)) {
-                log.warn("[INDEX-PERF] Data alani beklenmeyen formatta: {}",
-                        rawData != null ? rawData.getClass().getSimpleName() : "null");
+            try {
+                Map<String, Object> response = velzonApiClient.get(
+                        INDEXES_PERFORMANCE_PATH,
+                        new TypeReference<Map<String, Object>>() {}
+                );
+
+                // Data dizisini parse et
+                Object rawData = response.get("data");
+                if (!(rawData instanceof List)) {
+                    log.warn("[INDEX-PERF] Data alani beklenmeyen formatta: {}",
+                            rawData != null ? rawData.getClass().getSimpleName() : "null");
+                    return cachedPerformances != null ? cachedPerformances : List.of();
+                }
+
+                @SuppressWarnings("unchecked")
+                List<Map<String, Object>> data = (List<Map<String, Object>>) rawData;
+
+                List<IndexPerformanceDto> result = new ArrayList<>();
+
+                for (Map<String, Object> item : data) {
+                    IndexPerformanceDto dto = parseItem(item);
+                    if (dto != null) {
+                        result.add(dto);
+                    }
+                }
+
+                // Cache guncelle
+                this.cachedPerformances = Collections.unmodifiableList(result);
+                this.cacheTimestamp = System.currentTimeMillis();
+
+                log.info("[INDEX-PERF] {} endeks performans verisi basariyla yuklendi", result.size());
+
+                return cachedPerformances;
+
+            } catch (Exception e) {
+                log.error("[INDEX-PERF] Endeks performans verisi alinamadi: {}", e.getMessage(), e);
                 return cachedPerformances != null ? cachedPerformances : List.of();
             }
-
-            @SuppressWarnings("unchecked")
-            List<Map<String, Object>> data = (List<Map<String, Object>>) rawData;
-
-            List<IndexPerformanceDto> result = new ArrayList<>();
-
-            for (Map<String, Object> item : data) {
-                IndexPerformanceDto dto = parseItem(item);
-                if (dto != null) {
-                    result.add(dto);
-                }
-            }
-
-            // Cache guncelle
-            this.cachedPerformances = Collections.unmodifiableList(result);
-            this.cacheTimestamp = System.currentTimeMillis();
-
-            log.info("[INDEX-PERF] {} endeks performans verisi basariyla yuklendi", result.size());
-
-            return cachedPerformances;
-
-        } catch (Exception e) {
-            log.error("[INDEX-PERF] Endeks performans verisi alinamadi: {}", e.getMessage(), e);
-            return cachedPerformances != null ? cachedPerformances : List.of();
         }
     }
 

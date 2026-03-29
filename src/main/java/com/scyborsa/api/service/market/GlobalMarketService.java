@@ -3,6 +3,7 @@ package com.scyborsa.api.service.market;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.scyborsa.api.dto.market.GlobalMarketDto;
 import com.scyborsa.api.dto.screener.TvScreenerResponse;
+import com.scyborsa.api.utils.BistCacheUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
@@ -23,7 +24,9 @@ import java.util.Map;
  * HTTP istegi gondererek emtia, doviz, kripto ve uluslararasi endeks
  * verilerini ceker.</p>
  *
- * <p>Sonuclar volatile cache ile saklanir (60 saniye TTL).</p>
+ * <p>Sonuclar volatile cache ile saklanir. Seans saatlerinde 60 saniye,
+ * seans disinda 5 dakika TTL uygulanir (forex/kripto 7/24 islem gordugu icin
+ * kisa off-hours TTL, {@link BistCacheUtils#getAdaptiveTTL(long, long)}).</p>
  *
  * @see GlobalMarketDto
  */
@@ -34,8 +37,11 @@ public class GlobalMarketService {
     /** TradingView global scan endpoint URL'i. */
     private static final String GLOBAL_SCAN_URL = "https://scanner.tradingview.com/global/scan";
 
-    /** Cache TTL (milisaniye cinsinden): 60 saniye. */
-    private static final long CACHE_TTL_MS = 60_000L;
+    /** Seans ici cache TTL (milisaniye): 60 saniye. */
+    private static final long LIVE_TTL_MS = 60_000L;
+
+    /** Seans disi cache TTL (milisaniye): 5 dakika (forex/kripto 7/24). */
+    private static final long OFFHOURS_TTL_MS = 300_000L;
 
     /** HTTP baglanti timeout suresi (saniye). */
     private static final int CONNECT_TIMEOUT_SECONDS = 10;
@@ -98,6 +104,12 @@ public class GlobalMarketService {
     /** Cache: son guncelleme zamani (epoch millis). */
     private volatile long cacheTimestamp;
 
+    /** Cache yenileme icin kilit nesnesi. */
+    private final Object cacheLock = new Object();
+
+    /** Soguk baslatma hatasi sonrasi yeniden deneme suresi (milisaniye): 30 saniye. */
+    private static final long COLD_START_RETRY_MS = 30_000L;
+
     /**
      * Constructor injection ile bagimliliklari alir ve HTTP client olusturur.
      *
@@ -114,74 +126,110 @@ public class GlobalMarketService {
      * Global piyasa verilerini dondurur.
      *
      * <p>TradingView Scanner API'den emtia, doviz, kripto ve uluslararasi
-     * endeks verilerini alir. Sonuclar volatile cache ile 60 saniye saklanir.</p>
+     * endeks verilerini alir. Sonuclar volatile cache ile saklanir. Seans saatlerinde
+     * 60s, seans disinda 5dk adaptive TTL uygulanir
+     * ({@link BistCacheUtils#getAdaptiveTTL(long, long)}).</p>
      *
      * @return global piyasa listesi; hata durumunda bos liste
      */
-    public synchronized List<GlobalMarketDto> getGlobalMarkets() {
-        // Cache kontrolu (synchronized ile double-fetch onlenir)
+    public List<GlobalMarketDto> getGlobalMarkets() {
+        // Lock-free fast path: cache hit kontrolu (volatile read)
+        long ttl = BistCacheUtils.getAdaptiveTTL(LIVE_TTL_MS, OFFHOURS_TTL_MS);
         long now = System.currentTimeMillis();
-        if (cachedMarkets != null && (now - cacheTimestamp) < CACHE_TTL_MS) {
+        if (cachedMarkets != null && (now - cacheTimestamp) < ttl) {
             log.debug("[GLOBAL-MARKET] Cache hit, kalan sure: {}s",
-                    (CACHE_TTL_MS - (now - cacheTimestamp)) / 1000);
+                    (ttl - (now - cacheTimestamp)) / 1000);
             return cachedMarkets;
         }
 
-        log.info("[GLOBAL-MARKET] Global piyasa verileri TradingView API'den cekiliyor");
-
-        try {
-            HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(GLOBAL_SCAN_URL))
-                    .timeout(Duration.ofSeconds(REQUEST_TIMEOUT_SECONDS))
-                    .header("Content-Type", "application/json")
-                    .header("Accept", "application/json")
-                    .header("Origin", "https://tr.tradingview.com")
-                    .header("Referer", "https://tr.tradingview.com/")
-                    .POST(HttpRequest.BodyPublishers.ofString(SCAN_BODY))
-                    .build();
-
-            HttpResponse<String> response = httpClient.send(
-                    request,
-                    HttpResponse.BodyHandlers.ofString()
-            );
-
-            if (response.statusCode() != 200) {
-                log.error("[GLOBAL-MARKET] API hata kodu: {}", response.statusCode());
-                return cachedMarkets != null ? cachedMarkets : List.of();
+        synchronized (cacheLock) {
+            // Double-check: baska thread araya girip cache'i guncellemis olabilir
+            ttl = BistCacheUtils.getAdaptiveTTL(LIVE_TTL_MS, OFFHOURS_TTL_MS);
+            now = System.currentTimeMillis();
+            if (cachedMarkets != null && (now - cacheTimestamp) < ttl) {
+                return cachedMarkets;
             }
 
-            TvScreenerResponse tvResponse = objectMapper.readValue(
-                    response.body(), TvScreenerResponse.class);
+            log.info("[GLOBAL-MARKET] Global piyasa verileri TradingView API'den cekiliyor");
 
-            if (tvResponse == null || tvResponse.getData() == null) {
-                log.warn("[GLOBAL-MARKET] API response bos veya gecersiz");
-                return cachedMarkets != null ? cachedMarkets : List.of();
-            }
+            try {
+                HttpRequest request = HttpRequest.newBuilder()
+                        .uri(URI.create(GLOBAL_SCAN_URL))
+                        .timeout(Duration.ofSeconds(REQUEST_TIMEOUT_SECONDS))
+                        .header("Content-Type", "application/json")
+                        .header("Accept", "application/json")
+                        .header("Origin", "https://tr.tradingview.com")
+                        .header("Referer", "https://tr.tradingview.com/")
+                        .POST(HttpRequest.BodyPublishers.ofString(SCAN_BODY))
+                        .build();
 
-            List<GlobalMarketDto> result = new ArrayList<>();
+                HttpResponse<String> response = httpClient.send(
+                        request,
+                        HttpResponse.BodyHandlers.ofString()
+                );
 
-            for (TvScreenerResponse.DataItem item : tvResponse.getData()) {
-                GlobalMarketDto dto = parseItem(item);
-                if (dto != null) {
-                    result.add(dto);
+                if (response.statusCode() != 200) {
+                    log.error("[GLOBAL-MARKET] API hata kodu: {}", response.statusCode());
+                    bumpTimestampOnFailure(ttl);
+                    return cachedMarkets != null ? cachedMarkets : List.of();
                 }
+
+                TvScreenerResponse tvResponse = objectMapper.readValue(
+                        response.body(), TvScreenerResponse.class);
+
+                if (tvResponse == null || tvResponse.getData() == null) {
+                    log.warn("[GLOBAL-MARKET] API response bos veya gecersiz");
+                    bumpTimestampOnFailure(ttl);
+                    return cachedMarkets != null ? cachedMarkets : List.of();
+                }
+
+                List<GlobalMarketDto> result = new ArrayList<>();
+
+                for (TvScreenerResponse.DataItem item : tvResponse.getData()) {
+                    GlobalMarketDto dto = parseItem(item);
+                    if (dto != null) {
+                        result.add(dto);
+                    }
+                }
+
+                // Cache guncelle
+                this.cachedMarkets = Collections.unmodifiableList(result);
+                this.cacheTimestamp = System.currentTimeMillis();
+
+                log.info("[GLOBAL-MARKET] {} global piyasa verisi basariyla yuklendi", result.size());
+
+                return cachedMarkets;
+
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                log.error("[GLOBAL-MARKET] Istek kesildi: {}", e.getMessage());
+                bumpTimestampOnFailure(ttl);
+                return cachedMarkets != null ? cachedMarkets : List.of();
+            } catch (Exception e) {
+                log.error("[GLOBAL-MARKET] Global piyasa verisi alinamadi: {}", e.getMessage(), e);
+                bumpTimestampOnFailure(ttl);
+                return cachedMarkets != null ? cachedMarkets : List.of();
             }
+        }
+    }
 
-            // Cache guncelle
-            this.cachedMarkets = Collections.unmodifiableList(result);
+    /**
+     * Hata durumunda cache timestamp'ini gunceller (retry storm engeli).
+     *
+     * <p>Mevcut cache varsa tam TTL backoff uygular. Soguk baslatmada (cache yok)
+     * 30 saniye sonra yeniden denemeye izin verir.</p>
+     *
+     * @param currentTtl mevcut adaptive TTL degeri (milisaniye)
+     */
+    private void bumpTimestampOnFailure(long currentTtl) {
+        if (cachedMarkets != null) {
+            // Mevcut cache var — tam TTL backoff (retry storm engeli)
             this.cacheTimestamp = System.currentTimeMillis();
-
-            log.info("[GLOBAL-MARKET] {} global piyasa verisi basariyla yuklendi", result.size());
-
-            return cachedMarkets;
-
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            log.error("[GLOBAL-MARKET] Istek kesildi: {}", e.getMessage());
-            return cachedMarkets != null ? cachedMarkets : List.of();
-        } catch (Exception e) {
-            log.error("[GLOBAL-MARKET] Global piyasa verisi alinamadi: {}", e.getMessage(), e);
-            return cachedMarkets != null ? cachedMarkets : List.of();
+            log.warn("[GLOBAL-MARKET] Veri cekilemedi, mevcut cache korunuyor. TTL sonrasi yeniden denenecek.");
+        } else {
+            // Soguk baslatma hatasi — 30 saniye sonra yeniden dene
+            this.cacheTimestamp = System.currentTimeMillis() - currentTtl + COLD_START_RETRY_MS;
+            log.warn("[GLOBAL-MARKET] Soguk baslatmada veri cekilemedi, 30 saniye sonra yeniden denenecek.");
         }
     }
 
@@ -239,7 +287,7 @@ public class GlobalMarketService {
      * Object degerini double'a donusturur.
      *
      * @param value donusturulecek deger
-     * @return double deger; null veya donusturulemezse 0.0
+     * @return double deger; null veya donusturulemezse {@code null}
      */
     private Double toDoubleOrNull(Object value) {
         if (value instanceof Number number) {

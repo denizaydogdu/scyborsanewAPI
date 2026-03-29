@@ -1,6 +1,7 @@
 package com.scyborsa.api.service.market;
 
 import com.scyborsa.api.service.client.VelzonApiClient;
+import com.scyborsa.api.utils.BistCacheUtils;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.scyborsa.api.dto.market.DashboardSentimentDto;
@@ -23,6 +24,9 @@ import java.util.Map;
  * Her hisse icin {@code plot17} (kisa vadeli), {@code plot18} (orta vadeli),
  * {@code plot19} (uzun vadeli) alanlari 1 ise yukseliste kabul edilir.</p>
  *
+ * <p>Cache stratejisi: Seans saatlerinde 60 saniye, seans disinda bir sonraki seans acilisina kadar
+ * ({@link BistCacheUtils#getDynamicOffhoursTTL(long, long)}).</p>
+ *
  * @see VelzonApiClient
  * @see DashboardSentimentDto
  */
@@ -31,22 +35,92 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class SentimentService {
 
+    /** Seans ici cache TTL (milisaniye): 60 saniye. */
+    private static final long LIVE_TTL_MS = 60_000L;
+
+    /** Seans disi minimum cache TTL (milisaniye): 30 dakika. Gercek TTL bir sonraki seans acilisina kadar hesaplanir. */
+    private static final long MIN_OFFHOURS_TTL_MS = 1_800_000L;
+
+    /** Soguk baslatma hatasi sonrasi minimum yeniden deneme gecikmesi (milisaniye): 30 saniye. */
+    private static final long COLD_START_RETRY_MS = 30_000L;
+
     /** Velzon API istemcisi. */
     private final VelzonApiClient velzonApiClient;
 
+    /** Cache'lenmis sentiment verisi. */
+    private volatile DashboardSentimentDto cachedSentiment;
+
+    /** Cache'in son guncellenme zamani (epoch ms). */
+    private volatile long cacheTimestamp;
+
+    /** Cache yenileme icin kilit nesnesi. */
+    private final Object cacheLock = new Object();
+
     /**
-     * Piyasa sentiment verisini hesaplar ve dondurur.
+     * Piyasa sentiment verisini dondurur (cache'den).
+     *
+     * <p>Cache suresi dolduysa Velzon API'den yeni veri ceker.
+     * Seans saatlerinde 60s, seans disinda 30dk TTL uygulanir.</p>
+     *
+     * @return piyasa sentiment verisini iceren {@link DashboardSentimentDto}
+     */
+    public DashboardSentimentDto getSentimentData() {
+        refreshCacheIfStale();
+        DashboardSentimentDto sentiment = cachedSentiment;
+        return sentiment != null ? sentiment : buildEmptyDto();
+    }
+
+    /**
+     * Cache suresi dolduysa Velzon API'den yeni veri ceker.
+     * Double-check locking ile thread-safe cache yenileme.
+     */
+    private void refreshCacheIfStale() {
+        long ttl = BistCacheUtils.getDynamicOffhoursTTL(LIVE_TTL_MS, MIN_OFFHOURS_TTL_MS);
+        long now = System.currentTimeMillis();
+
+        if (cachedSentiment != null && (now - cacheTimestamp) < ttl) {
+            return;
+        }
+
+        synchronized (cacheLock) {
+            ttl = BistCacheUtils.getDynamicOffhoursTTL(LIVE_TTL_MS, MIN_OFFHOURS_TTL_MS);
+            now = System.currentTimeMillis();
+            if (cachedSentiment != null && (now - cacheTimestamp) < ttl) {
+                return;
+            }
+
+            log.info("[SENTIMENT] Cache yenileniyor (TTL: {}ms)", ttl);
+            DashboardSentimentDto freshData = fetchSentimentFromApi();
+
+            if (freshData != null && freshData.getToplamHisse() > 0) {
+                this.cachedSentiment = freshData;
+                this.cacheTimestamp = System.currentTimeMillis();
+                log.info("[SENTIMENT] Cache guncellendi: {} hisse", freshData.getToplamHisse());
+            } else {
+                if (cachedSentiment != null) {
+                    // Mevcut cache var — tam TTL backoff (retry storm engeli)
+                    this.cacheTimestamp = System.currentTimeMillis();
+                    log.warn("[SENTIMENT] Veri cekilemedi, mevcut cache korunuyor. TTL sonrasi yeniden denenecek.");
+                } else {
+                    // Soguk baslatma hatasi — 30 saniye sonra yeniden dene
+                    this.cacheTimestamp = System.currentTimeMillis() - ttl + COLD_START_RETRY_MS;
+                    log.warn("[SENTIMENT] Soguk baslatmada veri cekilemedi, 30 saniye sonra yeniden denenecek.");
+                }
+            }
+        }
+    }
+
+    /**
+     * Velzon API'den sentiment verisini ceker ve hesaplar.
      *
      * <p>Velzon API'den performans verisini ceker, {@code data} dizisindeki
      * her eleman icin {@code plot17}, {@code plot18}, {@code plot19} degerlerini
      * kontrol eder. Degeri 1 olan hisseler yukseliste kabul edilir ve
      * toplam hisse sayisina oranlanarak yuzde hesaplanir.</p>
      *
-     * <p>Hata durumunda log yazilir ve tum degerleri 0.0 olan DTO dondurulur.</p>
-     *
-     * @return piyasa sentiment verisini iceren {@link DashboardSentimentDto}
+     * @return piyasa sentiment DTO'su; hata durumunda {@code null}
      */
-    public DashboardSentimentDto getSentimentData() {
+    private DashboardSentimentDto fetchSentimentFromApi() {
         try {
             Map<String, Object> response = velzonApiClient.get(
                     "/api/pinescreener/velzon_performance",
@@ -57,7 +131,7 @@ public class SentimentService {
             if (!(rawData instanceof List)) {
                 log.warn("Sentiment verisi beklenmeyen formatta: {}",
                         rawData != null ? rawData.getClass().getSimpleName() : "null");
-                return buildEmptyDto();
+                return null;
             }
 
             @SuppressWarnings("unchecked")
@@ -65,7 +139,7 @@ public class SentimentService {
 
             if (data.isEmpty()) {
                 log.warn("Sentiment verisi bos dondu");
-                return buildEmptyDto();
+                return null;
             }
 
             int total = data.size();
@@ -93,7 +167,7 @@ public class SentimentService {
 
         } catch (Exception e) {
             log.error("Sentiment verisi alinamadi: {}", e.getMessage(), e);
-            return buildEmptyDto();
+            return null;
         }
     }
 

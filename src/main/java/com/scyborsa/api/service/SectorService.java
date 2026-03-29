@@ -7,9 +7,8 @@ import com.scyborsa.api.config.TradingViewConfig;
 import com.scyborsa.api.dto.sector.SectorDefinitionDto;
 import com.scyborsa.api.dto.sector.SectorStockDto;
 import com.scyborsa.api.dto.sector.SectorSummaryDto;
-import com.scyborsa.api.service.KatilimEndeksiService;
+import com.scyborsa.api.utils.BistCacheUtils;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.net.URI;
@@ -18,6 +17,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 /**
@@ -31,7 +31,7 @@ import java.util.stream.Collectors;
  * <ul>
  *   <li><b>Ozet (summaries):</b> Tek bir scan ile tum Turkiye hisselerini ceker,
  *       her hisseyi ilgili sektorlere esleyerek sektor bazli ozet istatistik uretir.
- *       Sonuclar volatile cache ile saklanir (varsayilan TTL: 120 saniye).</li>
+ *       Sonuclar volatile cache ile saklanir (seans ici 60 saniye, seans disi bir sonraki seans acilisina kadar).</li>
  *   <li><b>Detay (sector stocks):</b> Belirli bir sektor icin dinamik scan body
  *       olusturarak hisse listesini dondurur.</li>
  * </ul>
@@ -76,9 +76,26 @@ public class SectorService {
     /** Cache: son guncelleme zamani (epoch millis). */
     private volatile long cacheTimestamp;
 
-    /** Cache TTL (saniye cinsinden). */
-    @Value("${sector.cache.ttl-seconds:120}")
-    private int cacheTtlSeconds;
+    /** Cache yenileme icin kilit nesnesi. */
+    private final Object cacheLock = new Object();
+
+    /**
+     * Sektor detay (slug bazli) cache entry.
+     *
+     * @param stocks    cache'lenmis hisse listesi
+     * @param timestamp cache'e yazilma zamani (epoch millis)
+     */
+    private record SectorStocksCacheEntry(List<SectorStockDto> stocks, long timestamp) {
+    }
+
+    /** Slug bazli sektor hisse listesi cache'i. Thread-safe erisim icin ConcurrentHashMap. */
+    private final ConcurrentHashMap<String, SectorStocksCacheEntry> sectorStocksCache = new ConcurrentHashMap<>();
+
+    /** Seans ici cache TTL (milisaniye): 60 saniye. */
+    private static final long LIVE_TTL_MS = 60_000L;
+
+    /** Seans disi minimum cache TTL (milisaniye): 30 dakika. Gercek TTL bir sonraki seans acilisina kadar hesaplanir. */
+    private static final long MIN_OFFHOURS_TTL_MS = 1_800_000L;
 
     /**
      * Constructor injection ile bagimliliklari alir ve HTTP client olusturur.
@@ -116,90 +133,117 @@ public class SectorService {
      *         hata durumunda bos liste
      */
     public List<SectorSummaryDto> getSectorSummaries() {
-        // Cache kontrolu
+        // Cache kontrolu (ilk kontrol — lock disinda)
+        long ttl = BistCacheUtils.getDynamicOffhoursTTL(LIVE_TTL_MS, MIN_OFFHOURS_TTL_MS);
         long now = System.currentTimeMillis();
-        if (cachedSummaries != null && (now - cacheTimestamp) < (long) cacheTtlSeconds * 1000) {
+        if (cachedSummaries != null && (now - cacheTimestamp) < ttl) {
             log.debug("[SECTOR-SERVICE] Cache hit, kalan sure: {}s",
-                    cacheTtlSeconds - (now - cacheTimestamp) / 1000);
+                    (ttl - (now - cacheTimestamp)) / 1000);
             return cachedSummaries;
         }
 
-        log.info("[SECTOR-SERVICE] Sektor ozetleri hesaplaniyor (tum Turkiye hisseleri taranacak)");
-
-        String allStocksBody = buildAllStocksScanBody();
-        List<RawStockData> allStocks = scanAllStocks(allStocksBody);
-
-        if (allStocks.isEmpty()) {
-            log.warn("[SECTOR-SERVICE] Tum hisse taramasi bos sonuc dondurdu");
-            return cachedSummaries != null ? cachedSummaries : List.of();
-        }
-
-        // Her hisseyi sektorlere esle
-        Map<String, List<RawStockData>> sectorStocks = new HashMap<>();
-
-        for (RawStockData stock : allStocks) {
-            List<SectorDefinitionDto> matchedSectors = registry.matchStock(
-                    stock.tvSector, stock.tvIndustry, stock.ticker);
-
-            for (SectorDefinitionDto sector : matchedSectors) {
-                sectorStocks.computeIfAbsent(sector.getSlug(), k -> new ArrayList<>())
-                        .add(stock);
-            }
-        }
-
-        // Ozet DTO'lari olustur
-        List<SectorSummaryDto> summaries = new ArrayList<>();
-        for (SectorDefinitionDto def : registry.getAll()) {
-            List<RawStockData> stocks = sectorStocks.get(def.getSlug());
-            int stockCount = stocks != null ? stocks.size() : 0;
-            double avgChange = 0.0;
-            List<SectorSummaryDto.TopStockInfo> topStocks = List.of();
-
-            if (stocks != null && !stocks.isEmpty()) {
-                avgChange = stocks.stream().mapToDouble(RawStockData::changePercent).average().orElse(0.0);
-
-                // Top 3 hisse: |changePercent| en yuksek, changePercent DESC sirali
-                topStocks = stocks.stream()
-                        .sorted(Comparator.comparingDouble((RawStockData s) -> Math.abs(s.changePercent())).reversed())
-                        .limit(3)
-                        .map(s -> SectorSummaryDto.TopStockInfo.builder()
-                                .ticker(s.ticker())
-                                .description(s.description())
-                                .price(s.price())
-                                .changePercent(Math.round(s.changePercent() * 100.0) / 100.0)
-                                .volume(s.volume())
-                                .logoid(s.logoid())
-                                .katilim(katilimEndeksiService.isKatilim(s.ticker()))
-                                .build())
-                        .toList();
+        synchronized (cacheLock) {
+            // Double-check: baska thread araya girip cache'i guncellemis olabilir
+            ttl = BistCacheUtils.getDynamicOffhoursTTL(LIVE_TTL_MS, MIN_OFFHOURS_TTL_MS);
+            now = System.currentTimeMillis();
+            if (cachedSummaries != null && (now - cacheTimestamp) < ttl) {
+                return cachedSummaries;
             }
 
-            summaries.add(SectorSummaryDto.builder()
-                    .slug(def.getSlug())
-                    .displayName(def.getDisplayName())
-                    .description(def.getDescription())
-                    .icon(def.getIcon())
-                    .stockCount(stockCount)
-                    .avgChangePercent(Math.round(avgChange * 100.0) / 100.0)
-                    .topStocks(topStocks)
-                    .build());
+            log.info("[SECTOR-SERVICE] Sektor ozetleri hesaplaniyor (TTL: {}ms, tum Turkiye hisseleri taranacak)", ttl);
+
+            String allStocksBody = buildAllStocksScanBody();
+            List<RawStockData> allStocks = scanAllStocks(allStocksBody);
+
+            if (allStocks.isEmpty()) {
+                log.warn("[SECTOR-SERVICE] Tum hisse taramasi bos sonuc dondurdu");
+                long currentTtl = BistCacheUtils.getDynamicOffhoursTTL(LIVE_TTL_MS, MIN_OFFHOURS_TTL_MS);
+                if (cachedSummaries != null) {
+                    // Mevcut cache var — tam TTL backoff (retry storm engeli)
+                    this.cacheTimestamp = System.currentTimeMillis();
+                    log.warn("[SECTOR-SERVICE] Mevcut cache korunuyor. TTL sonrasi yeniden denenecek.");
+                } else {
+                    // Soguk baslatma hatasi — 30 saniye sonra yeniden dene
+                    this.cacheTimestamp = System.currentTimeMillis() - currentTtl + 30_000L;
+                    log.warn("[SECTOR-SERVICE] Soguk baslatmada bos sonuc, 30 saniye sonra yeniden denenecek.");
+                }
+                return cachedSummaries != null ? cachedSummaries : List.of();
+            }
+
+            // Her hisseyi sektorlere esle
+            Map<String, List<RawStockData>> sectorStocks = new HashMap<>();
+
+            for (RawStockData stock : allStocks) {
+                List<SectorDefinitionDto> matchedSectors = registry.matchStock(
+                        stock.tvSector, stock.tvIndustry, stock.ticker);
+
+                for (SectorDefinitionDto sector : matchedSectors) {
+                    sectorStocks.computeIfAbsent(sector.getSlug(), k -> new ArrayList<>())
+                            .add(stock);
+                }
+            }
+
+            // Ozet DTO'lari olustur
+            List<SectorSummaryDto> summaries = new ArrayList<>();
+            for (SectorDefinitionDto def : registry.getAll()) {
+                List<RawStockData> stocks = sectorStocks.get(def.getSlug());
+                int stockCount = stocks != null ? stocks.size() : 0;
+                double avgChange = 0.0;
+                List<SectorSummaryDto.TopStockInfo> topStocks = List.of();
+
+                if (stocks != null && !stocks.isEmpty()) {
+                    avgChange = stocks.stream().mapToDouble(RawStockData::changePercent).average().orElse(0.0);
+
+                    // Top 3 hisse: |changePercent| en yuksek, changePercent DESC sirali
+                    topStocks = stocks.stream()
+                            .sorted(Comparator.comparingDouble((RawStockData s) -> Math.abs(s.changePercent())).reversed())
+                            .limit(3)
+                            .map(s -> SectorSummaryDto.TopStockInfo.builder()
+                                    .ticker(s.ticker())
+                                    .description(s.description())
+                                    .price(s.price())
+                                    .changePercent(Math.round(s.changePercent() * 100.0) / 100.0)
+                                    .volume(s.volume())
+                                    .logoid(s.logoid())
+                                    .katilim(katilimEndeksiService.isKatilim(s.ticker()))
+                                    .build())
+                            .toList();
+                }
+
+                summaries.add(SectorSummaryDto.builder()
+                        .slug(def.getSlug())
+                        .displayName(def.getDisplayName())
+                        .description(def.getDescription())
+                        .icon(def.getIcon())
+                        .stockCount(stockCount)
+                        .avgChangePercent(Math.round(avgChange * 100.0) / 100.0)
+                        .topStocks(topStocks)
+                        .build());
+            }
+
+            // Ortalama degisim yuzdesine gore azalan sirala
+            summaries.sort(Comparator.comparingDouble(SectorSummaryDto::getAvgChangePercent).reversed());
+
+            // Cache guncelle
+            this.cachedSummaries = Collections.unmodifiableList(summaries);
+            this.cacheTimestamp = System.currentTimeMillis();
+
+            // Sektor detay cache'ini temizle — ozet yenilendiginde detay verisi de stale olabilir
+            sectorStocksCache.clear();
+
+            log.info("[SECTOR-SERVICE] {} sektor ozeti hesaplandi ({} hisse taranildi, detay cache temizlendi)",
+                    summaries.size(), allStocks.size());
+
+            return cachedSummaries;
         }
-
-        // Ortalama degisim yuzdesine gore azalan sirala
-        summaries.sort(Comparator.comparingDouble(SectorSummaryDto::getAvgChangePercent).reversed());
-
-        // Cache guncelle
-        this.cachedSummaries = Collections.unmodifiableList(summaries);
-        this.cacheTimestamp = System.currentTimeMillis();
-
-        log.info("[SECTOR-SERVICE] {} sektor ozeti hesaplandi ({} hisse taranildi)",
-                summaries.size(), allStocks.size());
-
-        return cachedSummaries;
     }
 
     /**
-     * Belirtilen sektore ait hisse listesini TradingView Scanner API'den ceker.
+     * Belirtilen sektore ait hisse listesini dondurur (slug bazli cache destekli).
+     *
+     * <p>Oncelikle slug bazli cache kontrol edilir. Cache gecerli ise (TTL dolmamissa)
+     * cached deger dondurulur. Aksi halde TradingView Scanner API'den taze veri cekilir,
+     * cache'e yazilir ve dondurulur.</p>
      *
      * <p>Sektor tanimina gore dinamik scan body olusturur:</p>
      * <ul>
@@ -218,8 +262,26 @@ public class SectorService {
             return List.of();
         }
 
+        // Cache kontrolu
+        long ttl = BistCacheUtils.getDynamicOffhoursTTL(LIVE_TTL_MS, MIN_OFFHOURS_TTL_MS);
+        long now = System.currentTimeMillis();
+        SectorStocksCacheEntry cached = sectorStocksCache.get(slug);
+        if (cached != null && (now - cached.timestamp()) < ttl) {
+            log.debug("[SECTOR-SERVICE] Sektor detay cache hit: slug={}, kalan sure: {}s",
+                    slug, (ttl - (now - cached.timestamp())) / 1000);
+            return cached.stocks();
+        }
+
+        // Cache miss — TradingView'dan taze veri cek
+        log.info("[SECTOR-SERVICE] Sektor detay fetch: slug={} (TTL: {}ms)", slug, ttl);
         String body = buildScanBody(def);
-        return scan(body);
+        List<SectorStockDto> stocks = scan(body);
+
+        // Basarili sonucu cache'le (bos liste de cache'lenir — gereksiz retry onleme)
+        sectorStocksCache.put(slug, new SectorStocksCacheEntry(
+                Collections.unmodifiableList(stocks), System.currentTimeMillis()));
+
+        return stocks;
     }
 
     /**

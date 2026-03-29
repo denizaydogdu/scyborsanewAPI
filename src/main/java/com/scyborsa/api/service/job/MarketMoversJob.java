@@ -4,6 +4,7 @@ import com.scyborsa.api.dto.market.MarketMoverDto;
 import com.scyborsa.api.service.market.MarketMoversBroadcastService;
 import com.scyborsa.api.service.market.MarketMoversCache;
 import com.scyborsa.api.service.market.ScreenerService;
+import com.scyborsa.api.utils.BistTradingCalendar;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -52,6 +53,11 @@ public class MarketMoversJob {
      */
     @Scheduled(fixedDelay = 3000)
     public void fetchMarketMovers() {
+        // Seans disinda gereksiz TradingView API cagrisi yapma
+        if (!BistTradingCalendar.isMarketOpen()) {
+            return;
+        }
+
         try {
             switch (fetchState) {
                 case 0 -> {

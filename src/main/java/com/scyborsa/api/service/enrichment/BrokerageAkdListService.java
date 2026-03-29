@@ -18,8 +18,8 @@ import java.util.stream.Collectors;
  * Piyasa geneli araci kurum AKD dagilim listesi servisi.
  *
  * <p>Fintables API'den tum araci kurumlarin toplu AKD verisini ceker,
- * dulestirir ve adaptif TTL'li volatile cache ile sunar
- * (seans ici 60s, seans disi/tatil 1 saat).</p>
+ * dulestirir ve dinamik TTL'li volatile cache ile sunar
+ * (seans ici 60s, seans disi bir sonraki seans acilisina kadar, minimum 1 saat).</p>
  *
  * @see FintablesApiClient#getBrokerageAkdList(String, String)
  * @see BrokerageAkdListResponseDto
@@ -35,8 +35,11 @@ public class BrokerageAkdListService {
     /** Seans ici cache TTL (milisaniye): 60 saniye. */
     private static final long CACHE_TTL_LIVE_MS = 60_000;
 
-    /** Seans disi cache TTL (milisaniye): 1 saat. */
-    private static final long CACHE_TTL_OFFHOURS_MS = 3_600_000;
+    /** Minimum seans disi cache TTL (milisaniye): 1 saat (guvenlik alt siniri). */
+    private static final long MIN_CACHE_TTL_OFFHOURS_MS = 3_600_000;
+
+    /** Soguk baslatma hatasi sonrasi minimum yeniden deneme gecikmesi (milisaniye): 30 saniye. */
+    private static final long COLD_START_RETRY_MS = 30_000L;
 
     /** Cache: son basarili API response. */
     private volatile BrokerageAkdListResponseDto cachedResponse;
@@ -47,41 +50,61 @@ public class BrokerageAkdListService {
     /** Cache: son guncelleme zamani (epoch millis). */
     private volatile long cacheTimestamp;
 
+    /** Cache yenileme icin kilit nesnesi. */
+    private final Object cacheLock = new Object();
+
     /**
      * Piyasa geneli araci kurum AKD dagilim listesini getirir.
-     * Adaptif TTL'li volatile cache kullanir (seans ici 60s, seans disi 1 saat).
+     * Dinamik TTL'li volatile cache kullanir (seans ici 60s, seans disi bir sonraki seans acilisina kadar).
      *
      * @param date tarih (YYYY-MM-DD, null ise bugun veya onceki islem gunu)
      * @return zenginlestirilmis AKD dagilim listesi
      */
     public BrokerageAkdListResponseDto getAkdList(String date) {
         String resolvedDate = BistCacheUtils.resolveDate(date);
+        long ttl = BistCacheUtils.getDynamicOffhoursTTL(CACHE_TTL_LIVE_MS, MIN_CACHE_TTL_OFFHOURS_MS);
+        long now = System.currentTimeMillis();
 
-        // Cache hit kontrolu
+        // Fast path: volatile cache hit (lock-free)
         if (cachedResponse != null
                 && resolvedDate.equals(cachedDate)
-                && (System.currentTimeMillis() - cacheTimestamp) < BistCacheUtils.getAdaptiveTTL(CACHE_TTL_LIVE_MS, CACHE_TTL_OFFHOURS_MS)) {
+                && (now - cacheTimestamp) < ttl) {
             return cachedResponse;
         }
 
-        try {
-            FintablesBrokerageAkdListDto raw = fintablesApiClient.getBrokerageAkdList(resolvedDate, resolvedDate);
-            BrokerageAkdListResponseDto response = transform(raw, resolvedDate);
-
-            // Cache guncelle
-            this.cachedResponse = response;
-            this.cachedDate = resolvedDate;
-            this.cacheTimestamp = System.currentTimeMillis();
-
-            return response;
-        } catch (Exception e) {
-            log.error("[BROKERAGE-AKD] Veri alinamadi (date={})", resolvedDate, e);
-            // Eski cache varsa don
-            if (cachedResponse != null) {
-                log.warn("[BROKERAGE-AKD] Eski cache donduruluyor (date={})", cachedDate);
+        synchronized (cacheLock) {
+            // Re-check inside lock (DCL)
+            ttl = BistCacheUtils.getDynamicOffhoursTTL(CACHE_TTL_LIVE_MS, MIN_CACHE_TTL_OFFHOURS_MS);
+            now = System.currentTimeMillis();
+            if (cachedResponse != null
+                    && resolvedDate.equals(cachedDate)
+                    && (now - cacheTimestamp) < ttl) {
                 return cachedResponse;
             }
-            return buildEmptyResponse(resolvedDate);
+
+            try {
+                FintablesBrokerageAkdListDto raw = fintablesApiClient.getBrokerageAkdList(resolvedDate, resolvedDate);
+                BrokerageAkdListResponseDto response = transform(raw, resolvedDate);
+
+                // Cache guncelle
+                this.cachedResponse = response;
+                this.cachedDate = resolvedDate;
+                this.cacheTimestamp = System.currentTimeMillis();
+
+                return response;
+            } catch (Exception e) {
+                log.error("[BROKERAGE-AKD] Veri alinamadi (date={})", resolvedDate, e);
+                if (cachedResponse != null) {
+                    // Mevcut cache var — tam TTL backoff (retry storm engeli)
+                    this.cacheTimestamp = System.currentTimeMillis();
+                    log.warn("[BROKERAGE-AKD] Mevcut cache korunuyor (date={}). TTL sonrasi yeniden denenecek.", cachedDate);
+                    return cachedResponse;
+                }
+                // Soguk baslatma hatasi — 30 saniye sonra yeniden dene
+                this.cacheTimestamp = System.currentTimeMillis() - ttl + COLD_START_RETRY_MS;
+                log.warn("[BROKERAGE-AKD] Soguk baslatmada veri cekilemedi (date={}), 30 saniye sonra yeniden denenecek.", resolvedDate);
+                return buildEmptyResponse(resolvedDate);
+            }
         }
     }
 

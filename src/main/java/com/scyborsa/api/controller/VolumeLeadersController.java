@@ -48,7 +48,8 @@ public class VolumeLeadersController {
             return ResponseEntity.ok(cache.getVolume());
         }
 
-        log.info("Volume cache boş, doğrudan screener'dan çekiliyor...");
+        // Cache bos — bir kerelik fetch yap (son veriyi al)
+        log.info("[VOLUME-LEADERS] Cache bos, screener'dan tek seferlik cekiliyor");
         List<MarketMoverDto> volume = screenerService.scanVolume();
         if (!volume.isEmpty()) {
             cache.updateVolume(volume);

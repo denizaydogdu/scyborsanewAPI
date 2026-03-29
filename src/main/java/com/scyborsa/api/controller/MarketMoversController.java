@@ -49,8 +49,8 @@ public class MarketMoversController {
             return ResponseEntity.ok(cache.getSnapshot());
         }
 
-        // Fallback: cache boşsa doğrudan API'ye istek at
-        log.info("Cache boş, doğrudan screener'dan çekiliyor...");
+        // Cache bos — bir kerelik fetch yap (seans ici veya disi farketmez, son veriyi al)
+        log.info("[MARKET-MOVERS] Cache bos, screener'dan tek seferlik cekiliyor");
         List<MarketMoverDto> rising = screenerService.scanRising();
         List<MarketMoverDto> falling = screenerService.scanFalling();
 
