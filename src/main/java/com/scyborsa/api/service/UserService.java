@@ -22,6 +22,7 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Kullanici islemlerini yoneten servis sinifi.
@@ -110,7 +111,7 @@ public class UserService {
 
         return LoginResponseDto.builder()
                 .success(true)
-                .role(user.getRole().name())
+                .role(user.getRole() != null ? user.getRole().name() : null)
                 .username(user.getUsername())
                 .email(user.getEmail())
                 .adSoyad(user.getAdSoyad())
@@ -160,33 +161,53 @@ public class UserService {
         // Email normalizasyonu (case-insensitive)
         String emailNorm = dto.getEmail() != null ? dto.getEmail().trim().toLowerCase() : null;
 
+        // Email zorunlu kontrolü
+        if (emailNorm == null || emailNorm.isBlank()) {
+            throw new RuntimeException("E-posta adresi zorunludur");
+        }
+
+        // Tarih sırası kontrolü
+        if (dto.getValidFrom() != null && dto.getValidTo() != null
+                && dto.getValidFrom().isAfter(dto.getValidTo())) {
+            throw new RuntimeException("Hesap başlangıç tarihi bitiş tarihinden sonra olamaz");
+        }
+
+        // Normalize edilmis degerler (duplicate check + persist tutarli olmali)
+        String normalizedUsername = normalizeBlankToNull(dto.getUsername());
+        String normalizedTelegram = normalizeBlankToNull(dto.getTelegramUsername());
+
         if (dto.getId() == null) {
             // Yeni kullanici — duplicate username kontrol (username opsiyonel)
-            if (dto.getUsername() != null && !dto.getUsername().isBlank()
-                    && appUserRepository.existsByUsername(dto.getUsername())) {
-                throw new RuntimeException("Bu kullanici adi zaten mevcut: " + dto.getUsername());
+            if (normalizedUsername != null
+                    && appUserRepository.existsByUsername(normalizedUsername)) {
+                throw new RuntimeException("Bu kullanici adi zaten mevcut: " + normalizedUsername);
             }
             // Yeni kullanici — duplicate email kontrol
-            if (emailNorm != null && appUserRepository.existsByEmail(emailNorm)) {
+            if (appUserRepository.existsByEmail(emailNorm)) {
                 throw new RuntimeException("Bu e-posta adresi zaten mevcut: " + emailNorm);
             }
             // Telegram username duplicate kontrol
-            if (dto.getTelegramUsername() != null && !dto.getTelegramUsername().isBlank()
-                    && appUserRepository.existsByTelegramUsernameIgnoreCase(dto.getTelegramUsername())) {
-                throw new RuntimeException("Bu Telegram adı zaten kullanılıyor: " + dto.getTelegramUsername());
+            if (normalizedTelegram != null
+                    && appUserRepository.existsByTelegramUsernameIgnoreCase(normalizedTelegram)) {
+                throw new RuntimeException("Bu Telegram adı zaten kullanılıyor: " + normalizedTelegram);
             }
             if (dto.getPassword() == null || dto.getPassword().isBlank()) {
                 throw new RuntimeException("Yeni kullanici icin sifre zorunludur");
             }
+            String normalizedPhone = normalizeBlankToNull(dto.getPhoneNumber());
+            if (normalizedPhone != null) {
+                normalizedPhone = canonicalizeTurkishPhone(normalizedPhone);
+                if (normalizedPhone.isEmpty()) normalizedPhone = null;
+            }
             user = AppUser.builder()
-                    .username(dto.getUsername())
+                    .username(normalizedUsername)
                     .email(emailNorm)
                     .password(passwordEncoder.encode(dto.getPassword()))
                     .adSoyad(dto.getAdSoyad())
                     .role(parseRole(dto.getRole()))
                     .userGroup(parseUserGroup(dto.getUserGroup()))
-                    .telegramUsername(normalizeBlankToNull(dto.getTelegramUsername()))
-                    .phoneNumber(normalizeBlankToNull(dto.getPhoneNumber()))
+                    .telegramUsername(normalizedTelegram)
+                    .phoneNumber(normalizedPhone)
                     .validFrom(dto.getValidFrom())
                     .validTo(dto.getValidTo())
                     .aktif(dto.getAktif() != null ? dto.getAktif() : true)
@@ -197,33 +218,38 @@ public class UserService {
                     .orElseThrow(() -> new RuntimeException("Kullanici bulunamadi: " + dto.getId()));
 
             // Username degistiyse duplicate kontrol (username opsiyonel)
-            if (dto.getUsername() != null && !dto.getUsername().isBlank()
-                    && !dto.getUsername().equals(user.getUsername())
-                    && appUserRepository.existsByUsername(dto.getUsername())) {
-                throw new RuntimeException("Bu kullanici adi zaten mevcut: " + dto.getUsername());
+            if (normalizedUsername != null
+                    && !normalizedUsername.equals(user.getUsername())
+                    && appUserRepository.existsByUsername(normalizedUsername)) {
+                throw new RuntimeException("Bu kullanici adi zaten mevcut: " + normalizedUsername);
             }
 
-            // Email degistiyse duplicate kontrol (stored email de normalize edilerek karsilastirilir)
+            // Email degistiyse duplicate kontrol
             String storedEmailNorm = user.getEmail() != null ? user.getEmail().trim().toLowerCase() : null;
-            if (emailNorm != null && !emailNorm.equals(storedEmailNorm)
+            if (!emailNorm.equals(storedEmailNorm)
                     && appUserRepository.existsByEmail(emailNorm)) {
                 throw new RuntimeException("Bu e-posta adresi zaten mevcut: " + emailNorm);
             }
 
             // Telegram username degistiyse duplicate kontrol
-            if (dto.getTelegramUsername() != null && !dto.getTelegramUsername().isBlank()
-                    && !dto.getTelegramUsername().equalsIgnoreCase(user.getTelegramUsername())
-                    && appUserRepository.existsByTelegramUsernameIgnoreCase(dto.getTelegramUsername())) {
-                throw new RuntimeException("Bu Telegram adı zaten kullanılıyor: " + dto.getTelegramUsername());
+            if (normalizedTelegram != null
+                    && !normalizedTelegram.equalsIgnoreCase(user.getTelegramUsername())
+                    && appUserRepository.existsByTelegramUsernameIgnoreCase(normalizedTelegram)) {
+                throw new RuntimeException("Bu Telegram adı zaten kullanılıyor: " + normalizedTelegram);
             }
 
-            user.setUsername(dto.getUsername());
+            String normalizedPhoneUpdate = normalizeBlankToNull(dto.getPhoneNumber());
+            if (normalizedPhoneUpdate != null) {
+                normalizedPhoneUpdate = canonicalizeTurkishPhone(normalizedPhoneUpdate);
+                if (normalizedPhoneUpdate.isEmpty()) normalizedPhoneUpdate = null;
+            }
+            user.setUsername(normalizedUsername);
             user.setEmail(emailNorm);
             user.setAdSoyad(dto.getAdSoyad());
             user.setRole(parseRole(dto.getRole()));
             user.setUserGroup(parseUserGroup(dto.getUserGroup()));
-            user.setTelegramUsername(normalizeBlankToNull(dto.getTelegramUsername()));
-            user.setPhoneNumber(normalizeBlankToNull(dto.getPhoneNumber()));
+            user.setTelegramUsername(normalizedTelegram);
+            user.setPhoneNumber(normalizedPhoneUpdate);
             user.setValidFrom(dto.getValidFrom());
             user.setValidTo(dto.getValidTo());
 
@@ -341,15 +367,24 @@ public class UserService {
             user.setAdSoyad(adSoyad);
         }
 
-        // Telegram username degistiyse duplicate kontrol
-        if (telegramUsername != null && !telegramUsername.isBlank()
-                && !telegramUsername.equalsIgnoreCase(user.getTelegramUsername())
-                && appUserRepository.existsByTelegramUsernameIgnoreCase(telegramUsername)) {
-            throw new RuntimeException("Bu Telegram adı zaten kullanılıyor: " + telegramUsername);
+        // Telegram username degistiyse duplicate kontrol ve guncelleme
+        if (telegramUsername != null) {
+            if (!telegramUsername.isBlank()
+                    && !telegramUsername.equalsIgnoreCase(user.getTelegramUsername())
+                    && appUserRepository.existsByTelegramUsernameIgnoreCase(telegramUsername)) {
+                throw new RuntimeException("Bu Telegram adı zaten kullanılıyor: " + telegramUsername);
+            }
+            user.setTelegramUsername(normalizeBlankToNull(telegramUsername));
         }
 
-        user.setTelegramUsername(normalizeBlankToNull(telegramUsername));
-        user.setPhoneNumber(normalizeBlankToNull(phoneNumber));
+        if (phoneNumber != null) {
+            String normalizedPhone = normalizeBlankToNull(phoneNumber);
+            if (normalizedPhone != null) {
+                normalizedPhone = canonicalizeTurkishPhone(normalizedPhone);
+                if (normalizedPhone.isEmpty()) normalizedPhone = null;
+            }
+            user.setPhoneNumber(normalizedPhone);
+        }
 
         // Sifre sadece dolu gonderilirse guncellenir
         if (password != null && !password.isBlank()) {
@@ -442,7 +477,7 @@ public class UserService {
                 .username(user.getUsername())
                 .email(user.getEmail())
                 .adSoyad(user.getAdSoyad())
-                .role(user.getRole().name())
+                .role(user.getRole() != null ? user.getRole().name() : null)
                 .userGroup(user.getUserGroup() != null ? user.getUserGroup().name() : "STANDART")
                 .telegramUsername(user.getTelegramUsername())
                 .phoneNumber(user.getPhoneNumber())
@@ -504,6 +539,73 @@ public class UserService {
     private String normalizeBlankToNull(String value) {
         if (value == null || value.isBlank()) return null;
         return value.trim();
+    }
+
+    /**
+     * Turk telefon numarasini kanonik 10 haneli formata donusturur.
+     *
+     * <p>Rakam disi karakterleri temizler, 90 ulke kodu ve basa eklenen 0'i cikarir.
+     * Ornegin: "+90 532 123 45 67" → "5321234567", "05321234567" → "5321234567"</p>
+     *
+     * @param raw ham telefon numarasi
+     * @return kanonik 10 haneli rakam dizisi veya bos string (null ise)
+     */
+    private String canonicalizeTurkishPhone(String raw) {
+        if (raw == null) return "";
+        String digits = raw.replaceAll("[^0-9]", "");
+        // Sondan 10 hane al (5XXXXXXXXX formatı)
+        if (digits.length() > 10) {
+            digits = digits.substring(digits.length() - 10);
+        }
+        return digits;
+    }
+
+
+    /**
+     * Email ve telefon numarasi ile kullanici kimligini dogrular.
+     *
+     * <p>Sifre sifirlama oncesi kimlik dogrulama adimi olarak kullanilir.
+     * Telefon numarasindaki rakam disi karakterler (bosluk, tire vb.) temizlenerek karsilastirilir.</p>
+     *
+     * @param email       kullanicinin e-posta adresi
+     * @param phoneNumber kullanicinin telefon numarasi
+     * @return kimlik dogrulanirsa {@code true}, aksi halde {@code false}
+     */
+    public boolean verifyIdentity(String email, String phoneNumber) {
+        if (email == null || phoneNumber == null) return false;
+        String emailNorm = email.trim().toLowerCase();
+        String phoneNorm = canonicalizeTurkishPhone(phoneNumber);
+        if (phoneNorm.isEmpty()) return false;
+        Optional<AppUser> userOpt = appUserRepository.findByEmail(emailNorm);
+        if (userOpt.isEmpty()) return false;
+        AppUser user = userOpt.get();
+        if (!Boolean.TRUE.equals(user.getAktif())) return false;
+        String dbPhone = canonicalizeTurkishPhone(user.getPhoneNumber());
+        return dbPhone.equals(phoneNorm);
+    }
+
+    /**
+     * Email ve telefon dogrulamasindan sonra kullanici sifresini sifirlar.
+     *
+     * <p>Once {@link #verifyIdentity(String, String)} ile kimlik dogrulanir,
+     * ardindan yeni sifre BCrypt ile hashlenerek kaydedilir.</p>
+     *
+     * @param email       kullanicinin e-posta adresi
+     * @param phoneNumber kullanicinin telefon numarasi
+     * @param newPassword yeni sifre (minimum 6 karakter)
+     * @return sifre basariyla sifirlanirsa {@code true}, aksi halde {@code false}
+     */
+    @Transactional
+    public boolean resetPassword(String email, String phoneNumber, String newPassword) {
+        if (!verifyIdentity(email, phoneNumber)) return false;
+        if (newPassword == null || newPassword.length() < 6) return false;
+        String emailNorm = email.trim().toLowerCase();
+        AppUser user = appUserRepository.findByEmail(emailNorm).orElse(null);
+        if (user == null) return false;
+        user.setPassword(passwordEncoder.encode(newPassword));
+        appUserRepository.save(user);
+        log.info("[USER] Sifre sifirlandi: email={}", emailNorm);
+        return true;
     }
 
     /**

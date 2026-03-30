@@ -2,6 +2,8 @@ package com.scyborsa.api.controller;
 
 import com.scyborsa.api.dto.auth.LoginRequestDto;
 import com.scyborsa.api.dto.auth.LoginResponseDto;
+import com.scyborsa.api.dto.auth.ResetPasswordRequestDto;
+import com.scyborsa.api.dto.auth.VerifyIdentityRequestDto;
 import com.scyborsa.api.service.UserService;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
@@ -11,6 +13,8 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.Map;
 
 /**
  * Kimlik dogrulama REST controller'i.
@@ -51,6 +55,87 @@ public class AuthController {
         return response.isSuccess()
                 ? ResponseEntity.ok(response)
                 : ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
+    }
+
+    /**
+     * Kullanici kimlik dogrulama islemi (sifre sifirlama oncesi).
+     *
+     * <p>Email ve telefon numarasi ile kullanicinin kimligini dogrular.
+     * Basarili ise sifre sifirlama adimina gecis yapilabilir.</p>
+     *
+     * @param request kimlik dogrulama istegi (email + phoneNumber)
+     * @return dogrulama sonucu ({@code success: true/false, message: "..."})
+     */
+    @PostMapping("/verify-identity")
+    public ResponseEntity<Map<String, Object>> verifyIdentity(@RequestBody VerifyIdentityRequestDto request) {
+        if (request.getEmail() == null || request.getEmail().isBlank()) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "success", false,
+                    "message", "E-posta adresi zorunludur"
+            ));
+        }
+        if (request.getPhoneNumber() == null || request.getPhoneNumber().isBlank()) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "success", false,
+                    "message", "Telefon numarasi zorunludur"
+            ));
+        }
+
+        boolean verified = userService.verifyIdentity(request.getEmail(), request.getPhoneNumber());
+        if (verified) {
+            return ResponseEntity.ok(Map.of(
+                    "success", true,
+                    "message", "Kimlik dogrulandi"
+            ));
+        }
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of(
+                "success", false,
+                "message", "Kimlik dogrulanamadi"
+        ));
+    }
+
+    /**
+     * Sifre sifirlama islemi.
+     *
+     * <p>Email ve telefon numarasi ile kimlik dogrulandiktan sonra
+     * yeni sifre belirlenir. Yeni sifre minimum 6 karakter olmalidir.</p>
+     *
+     * @param request sifre sifirlama istegi (email + phoneNumber + newPassword)
+     * @return sifirlama sonucu ({@code success: true/false, message: "..."})
+     */
+    @PostMapping("/reset-password")
+    public ResponseEntity<Map<String, Object>> resetPassword(@RequestBody ResetPasswordRequestDto request) {
+        if (request.getEmail() == null || request.getEmail().isBlank()) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "success", false,
+                    "message", "E-posta adresi zorunludur"
+            ));
+        }
+        if (request.getPhoneNumber() == null || request.getPhoneNumber().isBlank()) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "success", false,
+                    "message", "Telefon numarasi zorunludur"
+            ));
+        }
+        if (request.getNewPassword() == null || request.getNewPassword().length() < 6) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "success", false,
+                    "message", "Sifre en az 6 karakter olmalidir"
+            ));
+        }
+
+        boolean success = userService.resetPassword(
+                request.getEmail(), request.getPhoneNumber(), request.getNewPassword());
+        if (success) {
+            return ResponseEntity.ok(Map.of(
+                    "success", true,
+                    "message", "Sifre basariyla sifirlandi"
+            ));
+        }
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of(
+                "success", false,
+                "message", "Kimlik dogrulanamadi veya sifre sifirlanamadi"
+        ));
     }
 
     /**
