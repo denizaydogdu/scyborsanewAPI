@@ -8,7 +8,10 @@ import com.scyborsa.api.repository.PriceAlertRepository;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -79,12 +82,27 @@ public class PriceAlertEngine {
             initialized = true;
             log.info("[ALERT-ENGINE] Aktif alarmlar yuklendi: {} alarm, {} hisse",
                     activeAlerts.size(), alertIndex.size());
-
-            // Alarmlı hisseleri TradingView WebSocket'e subscribe et (canlı fiyat)
-            subscribeAllActiveStocks();
         } catch (Exception e) {
             log.error("[ALERT-ENGINE] Aktif alarm yukleme hatasi", e);
             initialized = true; // Hata olsa da motoru baslatarak yeni alarm eklemelerine izin ver
+        }
+    }
+
+    /**
+     * Uygulama tamamen baslatildiktan sonra aktif alarmlari WS'e subscribe eder.
+     *
+     * <p>{@code ApplicationReadyEvent} tum bean'ler ve embedded server hazir olduktan
+     * sonra atesler. {@code @Async} ile ayri thread'de calisir — main thread'i bloklamaz.
+     * FundService.warmUpCache() ile ayni pattern.</p>
+     */
+    @EventListener(ApplicationReadyEvent.class)
+    @Async
+    public void subscribeOnStartup() {
+        log.info("[ALERT-ENGINE] Startup WS subscribe basladi (ApplicationReadyEvent)");
+        try {
+            subscribeAllActiveStocks();
+        } catch (Exception e) {
+            log.warn("[ALERT-ENGINE] Startup WS subscribe hatasi: {}", e.getMessage());
         }
     }
 
@@ -295,6 +313,6 @@ public class PriceAlertEngine {
      */
     private String buildMessage(PriceAlert alert, double currentPrice) {
         String dir = alert.getDirection() == AlertDirection.ABOVE ? "hedefe ulaştı ≥" : "hedefe ulaştı ≤";
-        return String.format("%s %.2f₺", dir, currentPrice);
+        return String.format("%s %.2f₺ (%.2f₺)", dir, alert.getTargetPrice(), currentPrice);
     }
 }

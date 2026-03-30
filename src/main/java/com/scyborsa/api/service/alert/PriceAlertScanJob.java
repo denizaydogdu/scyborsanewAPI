@@ -84,7 +84,7 @@ public class PriceAlertScanJob {
                     symbol = symbol.substring(symbol.indexOf(':') + 1);
                 }
 
-                // d[0] = close price
+                // d[0] = close price (seans ici = son fiyat)
                 Object closeObj = item.getD().get(0);
                 if (closeObj instanceof Number) {
                     double price = ((Number) closeObj).doubleValue();
