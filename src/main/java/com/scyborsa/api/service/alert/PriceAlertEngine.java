@@ -294,8 +294,7 @@ public class PriceAlertEngine {
      * @return Turkce bildirim mesaji
      */
     private String buildMessage(PriceAlert alert, double currentPrice) {
-        String dir = alert.getDirection() == AlertDirection.ABOVE ? "ustune cikti" : "altina dustu";
-        return String.format("%s %.2f₺'nin %s (%.2f₺)",
-                alert.getStockCode(), alert.getTargetPrice(), dir, currentPrice);
+        String dir = alert.getDirection() == AlertDirection.ABOVE ? "hedefe ulaştı ≥" : "hedefe ulaştı ≤";
+        return String.format("%s %.2f₺", dir, currentPrice);
     }
 }
