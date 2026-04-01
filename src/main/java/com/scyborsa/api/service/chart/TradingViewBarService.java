@@ -584,13 +584,29 @@ public class TradingViewBarService {
                 // TRANSITION: closed → open
                 log.info("[CHART] Seans açıldı — alarm/watchlist/endeks quote subscribe yenileniyor");
                 marketWasOpen = true;
-                // WS bağlantısı gerekebilir — connect if needed
                 if (!isConnected()) {
                     connect();
                 }
-                resubscribeAlarmQuotes();
-                resubscribeWatchlistQuotes();
-                subscribeIndexQuotes();
+                // Async bekle — connect() async, hemen subscribe çağırmak race condition
+                TradingViewBarWebSocketClient wsRef = this.wsClient;
+                if (wsRef != null) {
+                    java.util.concurrent.CompletableFuture.runAsync(() -> {
+                        try {
+                            for (int i = 0; i < 25 && !wsRef.isConnected(); i++) {
+                                Thread.sleep(config.getChartWebsocketWaitMs());
+                            }
+                            if (wsRef.isConnected()) {
+                                resubscribeAlarmQuotes();
+                                resubscribeWatchlistQuotes();
+                                subscribeIndexQuotes();
+                            } else {
+                                log.warn("[CHART] Seans açılışı — WS bağlantı zaman aşımı, subscribe ertelendi");
+                            }
+                        } catch (InterruptedException e) {
+                            Thread.currentThread().interrupt();
+                        }
+                    });
+                }
             }
             marketWasOpen = true;
             return;

@@ -223,7 +223,7 @@ public class IndexPerformanceService {
         Map<String, double[]> result = new HashMap<>();
         for (String symbol : INDEX_SYMBOLS) {
             try {
-                Map<String, Object> quoteData = quotePriceCache.get("BIST:" + symbol);
+                Map<String, Object> quoteData = quotePriceCache.get(symbol);
                 if (quoteData == null) {
                     continue;
                 }
