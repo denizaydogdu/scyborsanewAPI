@@ -318,9 +318,11 @@ public class TradingViewBarService {
      */
     @Scheduled(fixedDelay = 30000)
     public void healthCheck() {
-        if (!isConnected() && !barCache.getAllSubscriptions().isEmpty()) {
-            log.warn("[BAR-SERVICE] Bağlantı kopuk, {} aktif subscription var. Reconnect...",
-                    barCache.getAllSubscriptions().size());
+        boolean hasBarSubs = !barCache.getAllSubscriptions().isEmpty();
+        boolean marketOpen = BistTradingCalendar.isMarketOpen();
+        if (!isConnected() && (hasBarSubs || marketOpen)) {
+            log.warn("[BAR-SERVICE] Bağlantı kopuk, reconnect... (bars={}, marketOpen={})",
+                    barCache.getAllSubscriptions().size(), marketOpen);
             connect();
 
             TradingViewBarWebSocketClient client = this.wsClient;
@@ -590,7 +592,7 @@ public class TradingViewBarService {
                 // Async bekle — connect() async, hemen subscribe çağırmak race condition
                 TradingViewBarWebSocketClient wsRef = this.wsClient;
                 if (wsRef != null) {
-                    java.util.concurrent.CompletableFuture.runAsync(() -> {
+                    CompletableFuture.runAsync(() -> {
                         try {
                             for (int i = 0; i < 25 && !wsRef.isConnected(); i++) {
                                 Thread.sleep(config.getChartWebsocketWaitMs());

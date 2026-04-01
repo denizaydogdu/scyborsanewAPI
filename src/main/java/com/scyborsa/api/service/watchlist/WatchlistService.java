@@ -481,7 +481,7 @@ public class WatchlistService {
             return dto;
         }
         try {
-            Map<String, Object> quoteData = quotePriceCache.get("BIST:" + dto.getStockCode());
+            Map<String, Object> quoteData = quotePriceCache.get(dto.getStockCode());
             if (quoteData != null) {
                 Object lp = quoteData.get("lp");
                 if (lp instanceof Number) {

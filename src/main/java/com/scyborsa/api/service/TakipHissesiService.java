@@ -258,7 +258,7 @@ public class TakipHissesiService {
             return null;
         }
         try {
-            Map<String, Object> quoteData = quotePriceCache.get("BIST:" + hisseKodu);
+            Map<String, Object> quoteData = quotePriceCache.get(hisseKodu);
             if (quoteData != null && quoteData.containsKey("lp")) {
                 Object lp = quoteData.get("lp");
                 if (lp instanceof Number) {

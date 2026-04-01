@@ -382,7 +382,7 @@ public class PriceAlertService {
             return null;
         }
         try {
-            Map<String, Object> quoteData = quotePriceCache.get("BIST:" + stockCode);
+            Map<String, Object> quoteData = quotePriceCache.get(stockCode);
             if (quoteData != null && quoteData.containsKey("lp")) {
                 Object lp = quoteData.get("lp");
                 if (lp instanceof Number) {
