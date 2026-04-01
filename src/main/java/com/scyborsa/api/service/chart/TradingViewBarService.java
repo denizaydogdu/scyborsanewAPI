@@ -284,6 +284,10 @@ public class TradingViewBarService {
     @EventListener(ApplicationReadyEvent.class)
     @Async
     public void subscribeIndexQuotesOnStartup() {
+        if (!BistTradingCalendar.isMarketOpen()) {
+            log.info("[BAR-SERVICE] Seans kapali, startup endeks WS subscribe ertelendi (checkMarketClose acilista tetikleyecek)");
+            return;
+        }
         log.info("[BAR-SERVICE] Startup endeks WS subscribe basladi (ApplicationReadyEvent)");
         try {
             if (!isConnected()) {
