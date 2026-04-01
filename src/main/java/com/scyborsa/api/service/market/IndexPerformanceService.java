@@ -1,21 +1,15 @@
 package com.scyborsa.api.service.market;
 
-import com.scyborsa.api.config.TradingViewConfig;
+import com.scyborsa.api.service.chart.QuotePriceCache;
 import com.scyborsa.api.service.client.VelzonApiClient;
 import com.scyborsa.api.utils.BistCacheUtils;
 
 import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.scyborsa.api.dto.market.IndexPerformanceDto;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -27,8 +21,9 @@ import java.util.Map;
  *
  * <p><b>Hibrit yaklasim:</b></p>
  * <ul>
- *   <li><b>TradingView Scanner API (gercek zamanli):</b> {@code lastPrice} ve {@code dailyChange} —
- *       canli fiyat ve gunluk degisim yuzdesi</li>
+ *   <li><b>QuotePriceCache (gercek zamanli):</b> {@code lastPrice} ve {@code dailyChange} —
+ *       TradingView WebSocket uzerinden gelen canli fiyat ve gunluk degisim yuzdesi.
+ *       35 endeks sembolu WS'e subscribe edilir, veriler QuotePriceCache'te tutulur.</li>
  *   <li><b>Velzon API (sparkline):</b> {@code weeklyChange}, {@code monthlyChange},
  *       {@code quarterlyChange}, {@code sixMonthChange}, {@code yearlyChange} —
  *       sparkline grafikleri icin coklu zaman dilimi verileri</li>
@@ -39,8 +34,8 @@ import java.util.Map;
  *
  * <p>Plot mapping (Velzon):</p>
  * <ul>
- *   <li>{@code plot16} → lastPrice (close) — TradingView ile override edilir</li>
- *   <li>{@code plot6} → dailyChange% — TradingView ile override edilir</li>
+ *   <li>{@code plot16} → lastPrice (close) — QuotePriceCache ile override edilir</li>
+ *   <li>{@code plot6} → dailyChange% — QuotePriceCache ile override edilir</li>
  *   <li>{@code plot7} → weeklyChange%</li>
  *   <li>{@code plot8} → monthlyChange%</li>
  *   <li>{@code plot9} → quarterlyChange%</li>
@@ -48,15 +43,15 @@ import java.util.Map;
  *   <li>{@code plot12} → yearlyChange%</li>
  * </ul>
  *
- * <p>TradingView Scanner istegi basarisiz olursa (graceful degradation),
- * Velzon verisi oldugu gibi kullanilir — davranis degismez.</p>
+ * <p>QuotePriceCache'te veri yoksa (graceful degradation), Velzon verisi
+ * oldugu gibi kullanilir — davranis degismez.</p>
  *
  * <p>Sonuclar volatile cache ile saklanir. Dinamik TTL stratejisi: seans
  * saatlerinde (09:50-18:25) 60 saniye, seans disinda bir sonraki seans acilisina kadar
  * ({@link BistCacheUtils#getDynamicOffhoursTTL(long, long)}).</p>
  *
  * @see VelzonApiClient
- * @see TradingViewConfig
+ * @see QuotePriceCache
  * @see IndexPerformanceDto
  */
 @Slf4j
@@ -67,26 +62,20 @@ public class IndexPerformanceService {
     private static final String INDEXES_PERFORMANCE_PATH = "/api/pinescreener/velzon_indexes_performance";
 
     /**
-     * TradingView Scanner API'sine gonderilen istek govdesi.
-     * <p>Tum BIST endekslerini explicit tickers listesi ile close ve change kolonlari ile ceker.</p>
+     * TradingView WebSocket'e subscribe edilen 35 BIST endeks sembolu.
+     * <p>Bu semboller TradingViewBarService tarafindan WS'e subscribe edilir,
+     * gelen veriler QuotePriceCache'te tutulur.</p>
      */
-    private static final String TV_INDEX_SCAN_BODY = """
-            {
-              "symbols": {
-                "tickers": [
-                  "BIST:XU100","BIST:XU050","BIST:XU030",
-                  "BIST:XBANK","BIST:XFINK","BIST:XUSIN","BIST:XHOLD","BIST:XGIDA",
-                  "BIST:XMADN","BIST:XSGRT","BIST:XELKT","BIST:XILTM","BIST:XKMYA",
-                  "BIST:XTRZM","BIST:XUMAL","BIST:XUTEK","BIST:XUHIZ","BIST:XINSA",
-                  "BIST:XKTUM","BIST:XYORT","BIST:XGMYO","BIST:XMANA","BIST:XK050",
-                  "BIST:XK030","BIST:XK100","BIST:XUTUM","BIST:XTCRT","BIST:XTEKS",
-                  "BIST:XMESY","BIST:XBLSM","BIST:XKAGT","BIST:XTAST","BIST:XULAS",
-                  "BIST:XSPOR","BIST:XAKUR"
-                ]
-              },
-              "columns": ["name", "close", "change"]
-            }
-            """;
+    public static final List<String> INDEX_SYMBOLS = List.of(
+            "XU100", "XU050", "XU030",
+            "XBANK", "XFINK", "XUSIN", "XHOLD", "XGIDA",
+            "XMADN", "XSGRT", "XELKT", "XILTM", "XKMYA",
+            "XTRZM", "XUMAL", "XUTEK", "XUHIZ", "XINSA",
+            "XKTUM", "XYORT", "XGMYO", "XMANA", "XK050",
+            "XK030", "XK100", "XUTUM", "XTCRT", "XTEKS",
+            "XMESY", "XBLSM", "XKAGT", "XTAST", "XULAS",
+            "XSPOR", "XAKUR"
+    );
 
     /** Seans ici cache TTL (milisaniye): 60 saniye. */
     private static final long LIVE_TTL_MS = 60_000L;
@@ -97,17 +86,9 @@ public class IndexPerformanceService {
     /** Velzon API istemcisi. */
     private final VelzonApiClient velzonApiClient;
 
-    /** TradingView API konfigurasyonu (URL, cookie, header). */
-    private final TradingViewConfig tradingViewConfig;
-
-    /** JSON parse icin Jackson ObjectMapper. */
-    private final ObjectMapper objectMapper;
-
-    /** HTTP istekleri icin Java 11 HttpClient. */
-    private final HttpClient httpClient;
-
-    /** TradingView Scanner API URL'i. */
-    private final String screenerUrl;
+    /** Anlik fiyat kotasyonu cache'i — TradingView WS uzerinden gelen gercek zamanli veriler. */
+    @Autowired(required = false)
+    private QuotePriceCache quotePriceCache;
 
     /** Cache: endeks performans listesi. Volatile ile thread-safe erisim. */
     private volatile List<IndexPerformanceDto> cachedPerformances;
@@ -119,22 +100,12 @@ public class IndexPerformanceService {
     private final Object cacheLock = new Object();
 
     /**
-     * Constructor injection ile bagimliliklari alir ve HTTP client olusturur.
+     * Constructor injection ile bagimliliklari alir.
      *
-     * @param velzonApiClient    Velzon API istemcisi (sparkline verileri icin)
-     * @param tradingViewConfig  TradingView API konfigurasyonu (URL, cookie, header)
-     * @param objectMapper       JSON parse icin Jackson ObjectMapper
+     * @param velzonApiClient Velzon API istemcisi (sparkline verileri icin)
      */
-    public IndexPerformanceService(VelzonApiClient velzonApiClient,
-                                   TradingViewConfig tradingViewConfig,
-                                   ObjectMapper objectMapper) {
+    public IndexPerformanceService(VelzonApiClient velzonApiClient) {
         this.velzonApiClient = velzonApiClient;
-        this.tradingViewConfig = tradingViewConfig;
-        this.objectMapper = objectMapper;
-        this.screenerUrl = tradingViewConfig.getScreenerApiUrl();
-        this.httpClient = HttpClient.newBuilder()
-                .connectTimeout(Duration.ofSeconds(tradingViewConfig.getHttpConnectTimeoutSeconds()))
-                .build();
     }
 
     /**
@@ -200,19 +171,19 @@ public class IndexPerformanceService {
                     }
                 }
 
-                // Hibrit: TradingView Scanner'dan gercek zamanli lastPrice + dailyChange al
-                Map<String, double[]> realtimePrices = fetchRealtimePrices();
+                // Hibrit: QuotePriceCache'ten gercek zamanli lastPrice + dailyChange al
+                Map<String, double[]> realtimePrices = fetchRealtimePricesFromCache();
                 if (!realtimePrices.isEmpty()) {
                     int overrideCount = 0;
                     for (IndexPerformanceDto dto : result) {
-                        double[] tvData = realtimePrices.get(dto.getSymbol());
-                        if (tvData != null) {
-                            dto.setLastPrice(tvData[0]);
-                            dto.setDailyChange(tvData[1]);
+                        double[] wsData = realtimePrices.get(dto.getSymbol());
+                        if (wsData != null) {
+                            dto.setLastPrice(wsData[0]);
+                            dto.setDailyChange(wsData[1]);
                             overrideCount++;
                         }
                     }
-                    log.info("[INDEX-PERF] TradingView gercek zamanli veri ile {}/{} endeks override edildi",
+                    log.info("[INDEX-PERF] QuotePriceCache gercek zamanli veri ile {}/{} endeks override edildi",
                             overrideCount, result.size());
                 }
 
@@ -232,81 +203,52 @@ public class IndexPerformanceService {
     }
 
     /**
-     * TradingView Scanner API'sinden BIST endekslerinin gercek zamanli fiyat ve gunluk degisim verilerini ceker.
+     * QuotePriceCache'ten BIST endekslerinin gercek zamanli fiyat ve gunluk degisim verilerini okur.
      *
-     * <p>HTTP POST istegi ile {@code scanner.tradingview.com/turkey/scan} endpoint'ine
-     * endeks tarama istegi gonderir. Sonuc olarak her endeks icin {@code close} ve
-     * {@code change} degerlerini dondurur.</p>
+     * <p>TradingView WebSocket uzerinden subscribe edilen 35 endeks sembolunun
+     * anlık fiyat verilerini QuotePriceCache'ten alir. Her endeks icin {@code lp}
+     * (last price) ve {@code chp} (change percent) degerlerini okur.</p>
      *
-     * <p>Graceful degradation: herhangi bir hata durumunda bos {@link Map} dondurur,
-     * boylece Velzon verisi oldugu gibi kullanilir.</p>
+     * <p>Graceful degradation: QuotePriceCache null ise veya bir sembol icin veri
+     * yoksa o sembol atlanir, Velzon verisi oldugu gibi kullanilir.</p>
      *
-     * @return sembol → [close, change%] haritasi; hata durumunda bos harita
+     * @return sembol → [lastPrice, changePercent] haritasi; cache bos ise bos harita
      */
-    private Map<String, double[]> fetchRealtimePrices() {
-        try {
-            HttpRequest.Builder requestBuilder = HttpRequest.newBuilder()
-                    .uri(URI.create(screenerUrl))
-                    .timeout(Duration.ofSeconds(tradingViewConfig.getHttpRequestTimeoutSeconds()))
-                    .header("Content-Type", "application/json")
-                    .header("Accept", "application/json")
-                    .header("Origin", tradingViewConfig.getHeadersOrigin())
-                    .header("Referer", tradingViewConfig.getHeadersReferer())
-                    .header("User-Agent", TradingViewConfig.DEFAULT_USER_AGENT)
-                    .POST(HttpRequest.BodyPublishers.ofString(TV_INDEX_SCAN_BODY));
-
-            String cookie = tradingViewConfig.getScreenerCookie();
-            if (cookie != null && !cookie.isBlank()) {
-                requestBuilder.header("Cookie", cookie);
-            }
-
-            HttpResponse<String> response = httpClient.send(
-                    requestBuilder.build(),
-                    HttpResponse.BodyHandlers.ofString()
-            );
-
-            if (response.statusCode() != 200) {
-                log.warn("[INDEX-PERF] TradingView Scanner API hatasi: status={}", response.statusCode());
-                return Map.of();
-            }
-
-            JsonNode root = objectMapper.readTree(response.body());
-            JsonNode dataArray = root.get("data");
-            if (dataArray == null || !dataArray.isArray()) {
-                log.warn("[INDEX-PERF] TradingView yaniti beklenen formatta degil");
-                return Map.of();
-            }
-
-            Map<String, double[]> result = new HashMap<>();
-            for (JsonNode item : dataArray) {
-                // "s" alani: "BIST:XU100" formatinda sembol
-                String rawSymbol = item.has("s") ? item.get("s").asText() : null;
-                if (rawSymbol == null) continue;
-
-                String symbol = extractSymbol(rawSymbol);
-                if (symbol == null) continue;
-
-                // "d" alani: [name, close, change] dizisi
-                JsonNode dArray = item.get("d");
-                if (dArray == null || !dArray.isArray() || dArray.size() < 3) continue;
-
-                // d[0]=name (string), d[1]=close (double), d[2]=change% (double)
-                double close = dArray.get(1).isNumber() ? dArray.get(1).asDouble() : 0.0;
-                double change = dArray.get(2).isNumber() ? dArray.get(2).asDouble() : 0.0;
-
-                if (close > 0) {
-                    result.put(symbol, new double[]{close, change});
-                }
-            }
-
-            log.info("[INDEX-PERF] TradingView Scanner'dan {} endeks gercek zamanli verisi alindi", result.size());
-            return result;
-
-        } catch (Exception e) {
-            log.warn("[INDEX-PERF] TradingView gercek zamanli veri alinamadi (graceful degradation): {}",
-                    e.getMessage());
+    private Map<String, double[]> fetchRealtimePricesFromCache() {
+        if (quotePriceCache == null) {
+            log.debug("[INDEX-PERF] QuotePriceCache mevcut degil, Velzon verisi kullanilacak");
             return Map.of();
         }
+
+        Map<String, double[]> result = new HashMap<>();
+        for (String symbol : INDEX_SYMBOLS) {
+            try {
+                Map<String, Object> quoteData = quotePriceCache.get("BIST:" + symbol);
+                if (quoteData == null) {
+                    continue;
+                }
+
+                Object lpObj = quoteData.get("lp");
+                Object chpObj = quoteData.get("chp");
+                if (!(lpObj instanceof Number)) {
+                    continue;
+                }
+
+                double lastPrice = ((Number) lpObj).doubleValue();
+                double changePercent = chpObj instanceof Number ? ((Number) chpObj).doubleValue() : 0.0;
+
+                if (lastPrice > 0) {
+                    result.put(symbol, new double[]{lastPrice, changePercent});
+                }
+            } catch (Exception e) {
+                log.debug("[INDEX-PERF] QuotePriceCache okuma hatasi: {} — {}", symbol, e.getMessage());
+            }
+        }
+
+        if (!result.isEmpty()) {
+            log.debug("[INDEX-PERF] QuotePriceCache'ten {} endeks gercek zamanli verisi okundu", result.size());
+        }
+        return result;
     }
 
     /**
