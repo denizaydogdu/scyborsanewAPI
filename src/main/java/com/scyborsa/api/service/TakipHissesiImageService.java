@@ -125,6 +125,10 @@ public class TakipHissesiImageService {
             return;
         }
         Path filePath = Paths.get(uploadDir, filename).normalize();
+        if (!filePath.startsWith(Paths.get(uploadDir).normalize())) {
+            log.warn("[TAKIP-HISSESI-IMAGE] Path traversal girişimi engellendi (delete): {}", filename);
+            return;
+        }
         try {
             Files.deleteIfExists(filePath);
             log.info("[TAKIP-HISSESI-IMAGE] Resim silindi: {}", filename);

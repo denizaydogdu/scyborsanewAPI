@@ -162,7 +162,14 @@ public class TakipHissesiController {
     public ResponseEntity<TakipHissesiDto> uploadImage(
             @PathVariable Long id,
             @RequestParam("resim") MultipartFile file) {
-        log.info("[TAKIP-HISSESI] Resim yükleme isteği: id={}, dosya={}", id, file.getOriginalFilename());
+        log.info("[TAKIP-HISSESI] Resim yükleme isteği: id={}", id);
+
+        // Eski resmi sil (orphan dosya birikmesini önle)
+        TakipHissesiDto existing = takipHissesiService.getTakipHissesiById(id);
+        if (existing.getResimUrl() != null && !existing.getResimUrl().isBlank()) {
+            imageService.deleteImage(existing.getResimUrl());
+        }
+
         String filename = imageService.saveImage(id, file);
         TakipHissesiDto updated = takipHissesiService.updateResimUrl(id, filename);
         return ResponseEntity.ok(updated);
