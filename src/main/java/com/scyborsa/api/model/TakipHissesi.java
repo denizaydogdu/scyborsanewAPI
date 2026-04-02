@@ -71,8 +71,8 @@ public class TakipHissesi {
     @Column(name = "maliyet_fiyati")
     private Double maliyetFiyati;
 
-    /** Oneri aciklamasi / sebep (opsiyonel, maks 500 karakter). */
-    @Column(name = "not_aciklama", length = 500)
+    /** Öneri açıklaması / sebep (opsiyonel, sınırsız uzunluk). */
+    @Column(name = "not_aciklama", columnDefinition = "TEXT")
     private String notAciklama;
 
     /** Yüklenen resim dosya adı (opsiyonel). */
