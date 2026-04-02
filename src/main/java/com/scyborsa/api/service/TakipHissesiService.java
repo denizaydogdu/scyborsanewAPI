@@ -1,5 +1,8 @@
 package com.scyborsa.api.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.scyborsa.api.dto.screener.ScanBodyDefinition;
+import com.scyborsa.api.dto.screener.TvScreenerResponse;
 import com.scyborsa.api.dto.takiphissesi.TakipHissesiDto;
 import com.scyborsa.api.dto.takiphissesi.TakipHissesiRequest;
 import com.scyborsa.api.enums.YatirimVadesi;
@@ -7,6 +10,7 @@ import com.scyborsa.api.model.TakipHissesi;
 import com.scyborsa.api.repository.TakipHissesiRepository;
 import com.scyborsa.api.service.chart.QuotePriceCache;
 import com.scyborsa.api.service.market.Bist100Service;
+import com.scyborsa.api.service.screener.TradingViewScreenerClient;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -14,8 +18,11 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * Takip hissesi (hisse onerisi) is mantigi servisi.
@@ -46,6 +53,14 @@ public class TakipHissesiService {
     @Autowired(required = false)
     private Bist100Service bist100Service;
 
+    /** TradingView Scanner API client — QuotePriceCache bos oldugunda fallback olarak kullanilir. */
+    @Autowired(required = false)
+    private TradingViewScreenerClient screenerClient;
+
+    /** JSON serializasyon icin ObjectMapper. */
+    @Autowired
+    private ObjectMapper objectMapper;
+
     /**
      * Aktif takip hisselerini guncel fiyat zenginlestirmesi ile getirir.
      *
@@ -53,11 +68,12 @@ public class TakipHissesiService {
      */
     @Transactional(readOnly = true)
     public List<TakipHissesiDto> getAktifTakipHisseleri() {
-        return takipHissesiRepository.findByAktifTrueOrderBySiraNoAsc()
+        List<TakipHissesiDto> dtos = takipHissesiRepository.findByAktifTrueOrderBySiraNoAsc()
                 .stream()
                 .map(this::toDto)
-                .map(this::enrichWithCurrentPrice)
                 .toList();
+        batchEnrichWithPrices(dtos);
+        return dtos;
     }
 
     /**
@@ -68,11 +84,12 @@ public class TakipHissesiService {
      */
     @Transactional(readOnly = true)
     public List<TakipHissesiDto> getAktifTakipHisseleriByVade(YatirimVadesi vade) {
-        return takipHissesiRepository.findByAktifTrueAndVadeOrderBySiraNoAsc(vade)
+        List<TakipHissesiDto> dtos = takipHissesiRepository.findByAktifTrueAndVadeOrderBySiraNoAsc(vade)
                 .stream()
                 .map(this::toDto)
-                .map(this::enrichWithCurrentPrice)
                 .toList();
+        batchEnrichWithPrices(dtos);
+        return dtos;
     }
 
     /**
@@ -84,11 +101,12 @@ public class TakipHissesiService {
      */
     @Transactional(readOnly = true)
     public List<TakipHissesiDto> getTumTakipHisseleri() {
-        return takipHissesiRepository.findAll(Sort.by("siraNo"))
+        List<TakipHissesiDto> dtos = takipHissesiRepository.findAll(Sort.by("siraNo"))
                 .stream()
                 .map(this::toDto)
-                .map(this::enrichWithCurrentPrice)
                 .toList();
+        batchEnrichWithPrices(dtos);
+        return dtos;
     }
 
     /**
@@ -100,10 +118,11 @@ public class TakipHissesiService {
      */
     @Transactional(readOnly = true)
     public TakipHissesiDto getTakipHissesiById(Long id) {
-        return takipHissesiRepository.findById(id)
+        TakipHissesiDto dto = takipHissesiRepository.findById(id)
                 .map(this::toDto)
-                .map(this::enrichWithCurrentPrice)
                 .orElseThrow(() -> new IllegalArgumentException("Takip hissesi bulunamadı: id=" + id));
+        batchEnrichWithPrices(List.of(dto));
+        return dto;
     }
 
     /**
@@ -242,51 +261,110 @@ public class TakipHissesiService {
     // ==================== PRIVATE HELPERS ====================
 
     /**
-     * DTO'yu guncel fiyat ve hesaplanmis alanlarla zenginlestirir.
+     * DTO listesini toplu olarak guncel fiyat ile zenginlestirir.
      *
-     * @param dto zenginlestirilecek DTO
-     * @return zenginlestirilmis DTO
+     * <p>Iki asamali strateji kullanir:
+     * <ol>
+     *   <li><strong>QuotePriceCache:</strong> Anlik WS fiyat cache'inden okuma (maliyet sifir)</li>
+     *   <li><strong>TradingView Scanner fallback:</strong> Cache'te bulunmayan hisseler icin
+     *       tek bir toplu Scanner API cagrisi yapar</li>
+     * </ol>
+     * Takip hissesi stoklari WebSocket'e abone olmadigi icin QuotePriceCache genellikle bos olur;
+     * Scanner fallback bu durumda devreye girer.</p>
+     *
+     * @param dtos zenginlestirilecek DTO listesi
      */
-    private TakipHissesiDto enrichWithCurrentPrice(TakipHissesiDto dto) {
-        // Logoid zenginlestirme
-        if (bist100Service != null && dto.getHisseKodu() != null) {
+    private void batchEnrichWithPrices(List<TakipHissesiDto> dtos) {
+        if (dtos.isEmpty()) {
+            return;
+        }
+
+        // Logo haritasini bir kez al
+        Map<String, String> logoMap = null;
+        if (bist100Service != null) {
             try {
-                Map<String, String> logoMap = bist100Service.getStockLogoidMap();
-                if (logoMap != null) {
-                    dto.setLogoid(logoMap.get(dto.getHisseKodu()));
-                }
+                logoMap = bist100Service.getStockLogoidMap();
             } catch (Exception e) {
-                log.debug("[TAKIP-HISSESI] Logoid zenginlestirme basarisiz: {}", dto.getHisseKodu());
+                log.debug("[TAKIP-HISSESI] Logo haritasi alinamadi: {}", e.getMessage());
             }
         }
 
-        Double guncelFiyat = getCurrentPrice(dto.getHisseKodu());
-        if (guncelFiyat != null) {
-            dto.setGuncelFiyat(guncelFiyat);
+        // Adim 1: QuotePriceCache'ten fiyat okuma denemesi
+        Map<String, Double> priceMap = new HashMap<>();
+        List<TakipHissesiDto> needsScanner = new ArrayList<>();
 
-            // Getiri yuzdesi hesapla
-            if (dto.getGirisFiyati() != null && dto.getGirisFiyati() > 0) {
-                double getiri = ((guncelFiyat - dto.getGirisFiyati()) / dto.getGirisFiyati()) * 100;
-                dto.setGetiriYuzde(Math.round(getiri * 100.0) / 100.0);
+        for (TakipHissesiDto dto : dtos) {
+            // Logoid zenginlestirme
+            if (logoMap != null && dto.getHisseKodu() != null) {
+                dto.setLogoid(logoMap.get(dto.getHisseKodu()));
             }
 
-            // Maliyet bazlı getiri yüzdesi
-            if (dto.getMaliyetFiyati() != null && dto.getMaliyetFiyati() > 0) {
-                double maliyetGetiri = ((guncelFiyat - dto.getMaliyetFiyati()) / dto.getMaliyetFiyati()) * 100;
-                dto.setMaliyetGetiriYuzde(Math.round(maliyetGetiri * 100.0) / 100.0);
-            }
-
-            // Hedef fiyata ulasildi mi
-            if (dto.getHedefFiyat() != null) {
-                dto.setHedefUlasildi(guncelFiyat >= dto.getHedefFiyat());
-            }
-
-            // Zarar durdur seviyesine ulasildi mi
-            if (dto.getZararDurdur() != null) {
-                dto.setZararDurdurUlasildi(guncelFiyat <= dto.getZararDurdur());
+            Double cachedPrice = getCurrentPriceFromCache(dto.getHisseKodu());
+            if (cachedPrice != null) {
+                priceMap.put(dto.getHisseKodu(), cachedPrice);
+            } else {
+                needsScanner.add(dto);
             }
         }
-        return dto;
+
+        // Adim 2: Cache'te bulunmayanlar icin Scanner fallback
+        if (!needsScanner.isEmpty() && screenerClient != null) {
+            List<String> missingCodes = needsScanner.stream()
+                    .map(TakipHissesiDto::getHisseKodu)
+                    .filter(code -> code != null && !code.isBlank())
+                    .distinct()
+                    .collect(Collectors.toList());
+
+            if (!missingCodes.isEmpty()) {
+                Map<String, Double> scannerPrices = fetchPricesFromScanner(missingCodes);
+                priceMap.putAll(scannerPrices);
+
+                if (!scannerPrices.isEmpty()) {
+                    log.debug("[TAKIP-HISSESI] Scanner fallback: {} hisse icin fiyat alindi (toplam {} eksikti)",
+                            scannerPrices.size(), missingCodes.size());
+                }
+            }
+        }
+
+        // Adim 3: Tum DTO'lari zenginlestir
+        for (TakipHissesiDto dto : dtos) {
+            Double guncelFiyat = priceMap.get(dto.getHisseKodu());
+            if (guncelFiyat != null) {
+                applyPriceEnrichment(dto, guncelFiyat);
+            }
+        }
+    }
+
+    /**
+     * DTO'ya guncel fiyat ve hesaplanmis alanlari uygular.
+     *
+     * @param dto         zenginlestirilecek DTO
+     * @param guncelFiyat guncel hisse fiyati
+     */
+    private void applyPriceEnrichment(TakipHissesiDto dto, double guncelFiyat) {
+        dto.setGuncelFiyat(guncelFiyat);
+
+        // Getiri yuzdesi hesapla
+        if (dto.getGirisFiyati() != null && dto.getGirisFiyati() > 0) {
+            double getiri = ((guncelFiyat - dto.getGirisFiyati()) / dto.getGirisFiyati()) * 100;
+            dto.setGetiriYuzde(Math.round(getiri * 100.0) / 100.0);
+        }
+
+        // Maliyet bazli getiri yuzdesi
+        if (dto.getMaliyetFiyati() != null && dto.getMaliyetFiyati() > 0) {
+            double maliyetGetiri = ((guncelFiyat - dto.getMaliyetFiyati()) / dto.getMaliyetFiyati()) * 100;
+            dto.setMaliyetGetiriYuzde(Math.round(maliyetGetiri * 100.0) / 100.0);
+        }
+
+        // Hedef fiyata ulasildi mi
+        if (dto.getHedefFiyat() != null) {
+            dto.setHedefUlasildi(guncelFiyat >= dto.getHedefFiyat());
+        }
+
+        // Zarar durdur seviyesine ulasildi mi
+        if (dto.getZararDurdur() != null) {
+            dto.setZararDurdurUlasildi(guncelFiyat <= dto.getZararDurdur());
+        }
     }
 
     /**
@@ -295,8 +373,8 @@ public class TakipHissesiService {
      * @param hisseKodu hisse borsa kodu
      * @return anlik fiyat veya {@code null} (cache mevcut degilse veya veri yoksa)
      */
-    private Double getCurrentPrice(String hisseKodu) {
-        if (quotePriceCache == null) {
+    private Double getCurrentPriceFromCache(String hisseKodu) {
+        if (quotePriceCache == null || hisseKodu == null) {
             return null;
         }
         try {
@@ -308,9 +386,63 @@ public class TakipHissesiService {
                 }
             }
         } catch (Exception e) {
-            log.debug("[TAKIP-HISSESI] Fiyat bilgisi alinamadi: hisseKodu={}, hata={}", hisseKodu, e.getMessage());
+            log.debug("[TAKIP-HISSESI] Cache fiyat okunamadi: hisseKodu={}, hata={}", hisseKodu, e.getMessage());
         }
         return null;
+    }
+
+    /**
+     * TradingView Scanner API'den toplu fiyat bilgisi ceker.
+     *
+     * <p>Tek bir HTTP cagrisi ile tum hisselerin close fiyatini alir.
+     * PriceAlertScanJob ile ayni scan body formatini kullanir.</p>
+     *
+     * @param stockCodes fiyati cekilecek hisse kodlari
+     * @return hisse kodu → close fiyat eslesmesi; hata durumunda bos map
+     */
+    private Map<String, Double> fetchPricesFromScanner(List<String> stockCodes) {
+        Map<String, Double> result = new HashMap<>();
+        try {
+            var tickers = stockCodes.stream()
+                    .map(code -> "BIST:" + code)
+                    .collect(Collectors.toList());
+            var body = Map.of(
+                    "symbols", Map.of("tickers", tickers),
+                    "columns", List.of("close")
+            );
+            String scanBody = objectMapper.writeValueAsString(body);
+            ScanBodyDefinition scanDef = new ScanBodyDefinition("TAKIP_HISSESI_PRICE", scanBody);
+
+            TvScreenerResponse response = screenerClient.executeScan(scanDef);
+            if (response == null || response.getData() == null) {
+                log.debug("[TAKIP-HISSESI] Scanner API yanit vermedi");
+                return result;
+            }
+
+            for (TvScreenerResponse.DataItem item : response.getData()) {
+                if (item.getS() == null || item.getD() == null || item.getD().isEmpty()) {
+                    continue;
+                }
+
+                // s = "BIST:THYAO" → "THYAO"
+                String symbol = item.getS();
+                if (symbol.contains(":")) {
+                    symbol = symbol.substring(symbol.indexOf(':') + 1);
+                }
+
+                // d[0] = close price
+                Object closeObj = item.getD().get(0);
+                if (closeObj instanceof Number) {
+                    double price = ((Number) closeObj).doubleValue();
+                    if (price > 0) {
+                        result.put(symbol, price);
+                    }
+                }
+            }
+        } catch (Exception e) {
+            log.warn("[TAKIP-HISSESI] Scanner fiyat cekme hatasi: {}", e.getMessage());
+        }
+        return result;
     }
 
     /**
