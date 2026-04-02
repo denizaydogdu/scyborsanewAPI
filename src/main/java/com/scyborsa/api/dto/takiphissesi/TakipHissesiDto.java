@@ -91,4 +91,7 @@ public class TakipHissesiDto {
 
     /** Guncel fiyat zarar durdur seviyesine ulasti mi. */
     private Boolean zararDurdurUlasildi;
+
+    /** TradingView logoid (hisse logosu icin, orn. "turk-hava-yollari"). */
+    private String logoid;
 }

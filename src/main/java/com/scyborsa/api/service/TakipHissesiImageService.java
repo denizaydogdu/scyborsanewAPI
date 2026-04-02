@@ -30,8 +30,8 @@ public class TakipHissesiImageService {
     @Value("${takip-hissesi.image.upload-dir:./uploads/takip-hisseleri}")
     private String uploadDir;
 
-    /** Maksimum dosya boyutu: 5 MB. */
-    private static final long MAX_FILE_SIZE = 5 * 1024 * 1024;
+    /** Maksimum dosya boyutu: 10 MB. */
+    private static final long MAX_FILE_SIZE = 10 * 1024 * 1024;
 
     /** İzin verilen dosya uzantıları. */
     private static final Set<String> ALLOWED_EXTENSIONS = Set.of("png", "jpg", "jpeg", "webp");

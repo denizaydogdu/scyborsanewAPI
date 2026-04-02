@@ -6,6 +6,7 @@ import com.scyborsa.api.enums.YatirimVadesi;
 import com.scyborsa.api.model.TakipHissesi;
 import com.scyborsa.api.repository.TakipHissesiRepository;
 import com.scyborsa.api.service.chart.QuotePriceCache;
+import com.scyborsa.api.service.market.Bist100Service;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -40,6 +41,10 @@ public class TakipHissesiService {
     /** Anlik fiyat cache — mevcut degilse null (graceful degradation). */
     @Autowired(required = false)
     private QuotePriceCache quotePriceCache;
+
+    /** BIST hisse logo haritasi — mevcut degilse null (graceful degradation). */
+    @Autowired(required = false)
+    private Bist100Service bist100Service;
 
     /**
      * Aktif takip hisselerini guncel fiyat zenginlestirmesi ile getirir.
@@ -243,6 +248,18 @@ public class TakipHissesiService {
      * @return zenginlestirilmis DTO
      */
     private TakipHissesiDto enrichWithCurrentPrice(TakipHissesiDto dto) {
+        // Logoid zenginlestirme
+        if (bist100Service != null && dto.getHisseKodu() != null) {
+            try {
+                Map<String, String> logoMap = bist100Service.getStockLogoidMap();
+                if (logoMap != null) {
+                    dto.setLogoid(logoMap.get(dto.getHisseKodu()));
+                }
+            } catch (Exception e) {
+                log.debug("[TAKIP-HISSESI] Logoid zenginlestirme basarisiz: {}", dto.getHisseKodu());
+            }
+        }
+
         Double guncelFiyat = getCurrentPrice(dto.getHisseKodu());
         if (guncelFiyat != null) {
             dto.setGuncelFiyat(guncelFiyat);
