@@ -67,9 +67,17 @@ public class TakipHissesi {
     @Column(name = "zarar_durdur")
     private Double zararDurdur;
 
+    /** Gerçek maliyet (alış) fiyatı (opsiyonel). */
+    @Column(name = "maliyet_fiyati")
+    private Double maliyetFiyati;
+
     /** Oneri aciklamasi / sebep (opsiyonel, maks 500 karakter). */
     @Column(name = "not_aciklama", length = 500)
     private String notAciklama;
+
+    /** Yüklenen resim dosya adı (opsiyonel). */
+    @Column(name = "resim_url", length = 255)
+    private String resimUrl;
 
     /** Aktif/pasif durumu. Soft delete için kullanılır. */
     @Column(name = "aktif", nullable = false)

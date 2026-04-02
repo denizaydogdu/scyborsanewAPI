@@ -4,6 +4,10 @@ server:
 spring:
   application:
     name: scyborsaApi
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 6MB
   task:
     scheduling:
       pool:

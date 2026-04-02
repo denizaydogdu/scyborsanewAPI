@@ -52,6 +52,12 @@ public class TakipHissesiDto {
     /** Zarar durdur (stop loss) fiyati. */
     private Double zararDurdur;
 
+    /** Gerçek maliyet (alış) fiyatı. */
+    private Double maliyetFiyati;
+
+    /** Yüklenen resim dosya adı. */
+    private String resimUrl;
+
     /** Oneri aciklamasi / sebep. */
     private String notAciklama;
 
@@ -76,6 +82,9 @@ public class TakipHissesiDto {
 
     /** Getiri yuzdesi: ((guncelFiyat - girisFiyati) / girisFiyati) * 100. */
     private Double getiriYuzde;
+
+    /** Maliyet bazlı getiri yüzdesi. */
+    private Double maliyetGetiriYuzde;
 
     /** Guncel fiyat hedef fiyata ulasti mi. */
     private Boolean hedefUlasildi;

@@ -3,16 +3,21 @@ package com.scyborsa.api.controller;
 import com.scyborsa.api.dto.takiphissesi.TakipHissesiDto;
 import com.scyborsa.api.dto.takiphissesi.TakipHissesiRequest;
 import com.scyborsa.api.enums.YatirimVadesi;
+import com.scyborsa.api.service.TakipHissesiImageService;
 import com.scyborsa.api.service.TakipHissesiService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.CacheControl;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import org.springframework.web.bind.MethodArgumentNotValidException;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -31,6 +36,7 @@ import java.util.stream.Collectors;
 public class TakipHissesiController {
 
     private final TakipHissesiService takipHissesiService;
+    private final TakipHissesiImageService imageService;
 
     /**
      * Aktif takip hisselerini listeler. Opsiyonel vade filtresi destekler.
@@ -144,6 +150,45 @@ public class TakipHissesiController {
     }
 
     /**
+     * Takip hissesine resim yükler.
+     *
+     * <p>HTTP POST {@code /api/v1/takip-hisseleri/{id}/resim} (multipart/form-data)</p>
+     *
+     * @param id   takip hissesi ID'si
+     * @param file yüklenen resim dosyası (png, jpg, jpeg, webp; maks 5MB)
+     * @return güncellenmiş takip hissesi DTO
+     */
+    @PostMapping(value = "/{id}/resim", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<TakipHissesiDto> uploadImage(
+            @PathVariable Long id,
+            @RequestParam("resim") MultipartFile file) {
+        log.info("[TAKIP-HISSESI] Resim yükleme isteği: id={}, dosya={}", id, file.getOriginalFilename());
+        String filename = imageService.saveImage(id, file);
+        TakipHissesiDto updated = takipHissesiService.updateResimUrl(id, filename);
+        return ResponseEntity.ok(updated);
+    }
+
+    /**
+     * Yüklenen resim dosyasını sunar.
+     *
+     * <p>HTTP GET {@code /api/v1/takip-hisseleri/images/{filename}}</p>
+     *
+     * @param filename resim dosya adı
+     * @return resim byte verisi veya HTTP 404
+     */
+    @GetMapping("/images/{filename:.+}")
+    public ResponseEntity<byte[]> getImage(@PathVariable String filename) {
+        byte[] data = imageService.getImage(filename);
+        if (data == null) {
+            return ResponseEntity.notFound().build();
+        }
+        return ResponseEntity.ok()
+                .contentType(imageService.getMediaType(filename))
+                .cacheControl(CacheControl.maxAge(Duration.ofDays(1)).cachePublic())
+                .body(data);
+    }
+
+    /**
      * {@link IllegalArgumentException} hatalarini HTTP 400 Bad Request olarak doner.
      *
      * @param ex yakalanan istisna
@@ -166,5 +211,18 @@ public class TakipHissesiController {
                 .map(fe -> fe.getField() + ": " + fe.getDefaultMessage())
                 .collect(Collectors.joining(", "));
         return ResponseEntity.badRequest().body(message);
+    }
+
+    /**
+     * Resim yükleme veya disk hatalarını HTTP 500 olarak döner.
+     *
+     * @param ex yakalanan çalışma zamanı istisnası
+     * @return kullanıcı dostu hata mesajı ile HTTP 500 yanıtı
+     */
+    @ExceptionHandler(RuntimeException.class)
+    public ResponseEntity<String> handleRuntimeError(RuntimeException ex) {
+        log.error("[TAKIP-HISSESI] Beklenmeyen hata", ex);
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body("İşlem sırasında bir hata oluştu. Lütfen tekrar deneyiniz.");
     }
 }

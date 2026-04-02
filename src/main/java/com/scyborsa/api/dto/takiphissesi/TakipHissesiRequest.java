@@ -51,6 +51,10 @@ public class TakipHissesiRequest {
     @DecimalMin(value = "0.01")
     private Double zararDurdur;
 
+    /** Gerçek maliyet (alış) fiyatı (opsiyonel). */
+    @DecimalMin(value = "0.01")
+    private Double maliyetFiyati;
+
     /** Oneri aciklamasi / sebep (opsiyonel, maks 500 karakter). */
     @Size(max = 500)
     private String notAciklama;

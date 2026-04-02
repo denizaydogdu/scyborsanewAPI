@@ -170,6 +170,7 @@ public class TakipHissesiService {
         entity.setHedefFiyat(request.getHedefFiyat());
         entity.setZararDurdur(request.getZararDurdur());
         entity.setNotAciklama(request.getNotAciklama());
+        entity.setMaliyetFiyati(request.getMaliyetFiyati());
         entity.setSiraNo(request.getSiraNo());
 
         TakipHissesi saved = takipHissesiRepository.save(entity);
@@ -215,6 +216,24 @@ public class TakipHissesiService {
         log.info("[TAKIP-HISSESI] Öneri aktifleştirildi: id={}, hisseKodu={}", id, entity.getHisseKodu());
     }
 
+    /**
+     * Takip hissesinin resim URL'sini günceller.
+     *
+     * @param id       takip hissesi ID'si
+     * @param resimUrl yeni resim dosya adı
+     * @return güncellenmiş takip hissesi DTO
+     * @throws IllegalArgumentException kayıt bulunamazsa
+     */
+    @Transactional
+    public TakipHissesiDto updateResimUrl(Long id, String resimUrl) {
+        TakipHissesi entity = takipHissesiRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Takip hissesi bulunamadı: id=" + id));
+        entity.setResimUrl(resimUrl);
+        TakipHissesi saved = takipHissesiRepository.save(entity);
+        log.info("[TAKIP-HISSESI] Resim güncellendi: id={}, resimUrl={}", id, resimUrl);
+        return toDto(saved);
+    }
+
     // ==================== PRIVATE HELPERS ====================
 
     /**
@@ -232,6 +251,12 @@ public class TakipHissesiService {
             if (dto.getGirisFiyati() != null && dto.getGirisFiyati() > 0) {
                 double getiri = ((guncelFiyat - dto.getGirisFiyati()) / dto.getGirisFiyati()) * 100;
                 dto.setGetiriYuzde(Math.round(getiri * 100.0) / 100.0);
+            }
+
+            // Maliyet bazlı getiri yüzdesi
+            if (dto.getMaliyetFiyati() != null && dto.getMaliyetFiyati() > 0) {
+                double maliyetGetiri = ((guncelFiyat - dto.getMaliyetFiyati()) / dto.getMaliyetFiyati()) * 100;
+                dto.setMaliyetGetiriYuzde(Math.round(maliyetGetiri * 100.0) / 100.0);
             }
 
             // Hedef fiyata ulasildi mi
@@ -287,6 +312,8 @@ public class TakipHissesiService {
                 .girisTarihi(entity.getGirisTarihi())
                 .hedefFiyat(entity.getHedefFiyat())
                 .zararDurdur(entity.getZararDurdur())
+                .maliyetFiyati(entity.getMaliyetFiyati())
+                .resimUrl(entity.getResimUrl())
                 .notAciklama(entity.getNotAciklama())
                 .aktif(entity.getAktif())
                 .siraNo(entity.getSiraNo())
@@ -310,6 +337,7 @@ public class TakipHissesiService {
                 .girisTarihi(request.getGirisTarihi())
                 .hedefFiyat(request.getHedefFiyat())
                 .zararDurdur(request.getZararDurdur())
+                .maliyetFiyati(request.getMaliyetFiyati())
                 .notAciklama(request.getNotAciklama())
                 .siraNo(request.getSiraNo())
                 .build();
