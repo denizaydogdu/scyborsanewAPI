@@ -144,7 +144,7 @@ public class TemelAnalizSkorService {
         List<FinansalOranDto> oranlar = finansalOranService.getHisseOranlar(stockCode);
 
         if (bilanco.isEmpty() || gelir.isEmpty()) {
-            log.debug("[ALTMAN] Bilanço veya gelir tablosu bulunamadı: {}", stockCode);
+            log.info("[ALTMAN] Bilanço veya gelir tablosu bulunamadı: {} (bilanco={}, gelir={})", stockCode, bilanco.size(), gelir.size());
             return null;
         }
 
@@ -198,7 +198,8 @@ public class TemelAnalizSkorService {
 
         // X3 = FVÖK / Toplam Varlıklar
         Long fvok = findGelirValue(gelirMap, "Esas Faaliyet Karı", "Esas Faaliyet Kar/Zararı",
-                "ESAS FAALİYET KARI (ZARARI)");
+                "ESAS FAALİYET KARI (ZARARI)", "Faaliyet Karı (Zararı)", "Faaliyet Karı",
+                "Finansman Geliri (Gideri) Öncesi Faaliyet Karı (Zararı)");
         Double x3 = (fvok != null)
                 ? (double) fvok / toplamVarliklar : null;
 
@@ -221,7 +222,7 @@ public class TemelAnalizSkorService {
 
         // Altman Z-Score formülü 5 bileşenin TAMAMINI gerektirir — eksik bileşenle partial hesap hatalı sonuç verir
         if (x1 == null || x2 == null || x3 == null || x4 == null || x5 == null) {
-            log.debug("[ALTMAN] Eksik bileşen, Z-Score hesaplanamadı: {} (x1={}, x2={}, x3={}, x4={}, x5={})",
+            log.info("[ALTMAN] Eksik bileşen, Z-Score hesaplanamadı: {} (x1={}, x2={}, x3={}, x4={}, x5={})",
                     stockCode, x1, x2, x3, x4, x5);
             return null;
         }
