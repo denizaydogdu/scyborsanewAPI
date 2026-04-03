@@ -292,8 +292,12 @@ public class KapMcpService {
                     String content = chunk.has("content") ? chunk.get("content").asText()
                             : chunk.has("text") ? chunk.get("text").asText() : null;
                     if (content != null && !content.isBlank()) {
-                        if (sb.length() > 0) sb.append("\n\n");
-                        sb.append(content);
+                        // Gereksiz metin temizliği
+                        content = cleanChunkContent(content);
+                        if (!content.isBlank()) {
+                            if (sb.length() > 0) sb.append("\n\n");
+                            sb.append(content);
+                        }
                     }
                 }
                 if (sb.length() > 0) return sb.toString();
@@ -328,6 +332,20 @@ public class KapMcpService {
         }
 
         return jsonText;
+    }
+
+    /**
+     * Chunk içeriğinden gereksiz metinleri temizler.
+     *
+     * @param content ham chunk içeriği
+     * @return temizlenmiş içerik
+     */
+    private String cleanChunkContent(String content) {
+        if (content == null) return "";
+        // "Logo" tek başına satır sonunda veya başında geliyor
+        content = content.replaceAll("(?m)^Logo\\s*$", "").trim();
+        content = content.replaceAll("\\bLogo\\s*$", "").trim();
+        return content;
     }
 
     /**
