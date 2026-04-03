@@ -76,6 +76,23 @@ public class SectorService {
     /** Cache: son guncelleme zamani (epoch millis). */
     private volatile long cacheTimestamp;
 
+    /**
+     * Hisse kodu → sektör bilgisi (displayName, slug) eşlemesi.
+     *
+     * <p>{@link #getSectorSummaries()} taraması sırasında doldurulur.
+     * Her hissenin ilk eşleşen sektörü saklanır.</p>
+     */
+    private volatile Map<String, StockSectorInfo> stockToSectorMap = Map.of();
+
+    /**
+     * Bir hissenin sektör bilgisini taşıyan basit record.
+     *
+     * @param displayName sektör görünen adı (ör: "Bankacılık")
+     * @param slug        sektör slug'ı (ör: "bankacilik")
+     */
+    public record StockSectorInfo(String displayName, String slug) {
+    }
+
     /** Cache yenileme icin kilit nesnesi. */
     private final Object cacheLock = new Object();
 
@@ -183,6 +200,21 @@ public class SectorService {
                 }
             }
 
+            // Hisse → sektör eşleme haritasını oluştur (ilk eşleşen sektör kazanır)
+            Map<String, StockSectorInfo> newStockMap = new HashMap<>();
+            for (RawStockData stock : allStocks) {
+                if (!newStockMap.containsKey(stock.ticker())) {
+                    List<SectorDefinitionDto> matched = registry.matchStock(
+                            stock.tvSector(), stock.tvIndustry(), stock.ticker());
+                    if (!matched.isEmpty()) {
+                        SectorDefinitionDto first = matched.get(0);
+                        newStockMap.put(stock.ticker(), new StockSectorInfo(first.getDisplayName(), first.getSlug()));
+                    }
+                }
+            }
+            this.stockToSectorMap = Collections.unmodifiableMap(newStockMap);
+            log.debug("[SECTOR-SERVICE] stockToSectorMap güncellendi: {} hisse", newStockMap.size());
+
             // Ozet DTO'lari olustur
             List<SectorSummaryDto> summaries = new ArrayList<>();
             for (SectorDefinitionDto def : registry.getAll()) {
@@ -282,6 +314,26 @@ public class SectorService {
                 Collections.unmodifiableList(stocks), System.currentTimeMillis()));
 
         return stocks;
+    }
+
+    /**
+     * Belirtilen hisse kodunun ait olduğu sektör bilgisini döndürür.
+     *
+     * <p>Sektör özetleri taraması ({@link #getSectorSummaries()}) sırasında oluşturulan
+     * {@code stockToSectorMap} üzerinden O(1) lookup yapar. Harita boşsa veya hisse
+     * bulunamazsa {@code null} döner.</p>
+     *
+     * <p>Not: Bu metod cache'i tetiklemez. Cache henüz oluşmadıysa (uygulama yeni
+     * başlamışsa) {@code null} dönebilir. Çağıran taraf fallback mekanizması kurmalıdır.</p>
+     *
+     * @param stockCode hisse kodu (ör: "GARAN", "A1CAP")
+     * @return sektör bilgisi ({@link StockSectorInfo}) veya bulunamazsa {@code null}
+     */
+    public StockSectorInfo findSectorForStock(String stockCode) {
+        if (stockCode == null || stockCode.isBlank()) {
+            return null;
+        }
+        return stockToSectorMap.get(stockCode.toUpperCase().trim());
     }
 
     /**

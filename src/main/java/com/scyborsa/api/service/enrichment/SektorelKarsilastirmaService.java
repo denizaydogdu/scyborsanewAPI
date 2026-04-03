@@ -1,14 +1,20 @@
 package com.scyborsa.api.service.enrichment;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.scyborsa.api.dto.fintables.FinansalOranDto;
 import com.scyborsa.api.dto.fintables.SektorelKarsilastirmaDto;
 import com.scyborsa.api.dto.sector.SectorSummaryDto;
 import com.scyborsa.api.service.SectorService;
+import com.scyborsa.api.service.client.FintablesMcpClient;
+import com.scyborsa.api.service.client.FintablesMcpTokenStore;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
@@ -49,6 +55,9 @@ public class SektorelKarsilastirmaService {
             "F/K", "PD/DD", "ROE", "ROA", "Cari Oran", "Brüt Kar Marjı", "Net Kar Marjı"
     );
 
+    /** Kurumsal bilgi kartından sektör bilgisi parse etmek için regex. */
+    private static final Pattern SEKTOR_PATTERN = Pattern.compile("\\*\\*Sektör:\\*\\*\\s*(.+)");
+
     /** Finansal oran servisi. Bean yoksa {@code null}. */
     @Autowired(required = false)
     private FinansalOranService finansalOranService;
@@ -56,6 +65,18 @@ public class SektorelKarsilastirmaService {
     /** Sektör servisi. Bean yoksa {@code null}. */
     @Autowired(required = false)
     private SectorService sectorService;
+
+    /** Fintables MCP istemcisi. Bean yoksa {@code null}. */
+    @Autowired(required = false)
+    private FintablesMcpClient fintablesMcpClient;
+
+    /** Fintables MCP token deposu. Bean yoksa {@code null}. */
+    @Autowired(required = false)
+    private FintablesMcpTokenStore fintablesMcpTokenStore;
+
+    /** JSON işlemleri için ObjectMapper. */
+    @Autowired
+    private ObjectMapper objectMapper;
 
     /**
      * Belirtilen hisse için sektörel oran karşılaştırması yapar.
@@ -82,16 +103,18 @@ public class SektorelKarsilastirmaService {
                 SektorelKarsilastirmaDto.builder().hisseSenediKodu(code);
 
         try {
-            // 1. Hissenin sektörünü bul
-            String sektorAdi = findSectorForStock(code);
-            if (sektorAdi == null) {
+            // 1. Hissenin sektörünü bul (displayName + slug)
+            String[] sektorBilgisi = findSectorForStockWithSlug(code);
+            if (sektorBilgisi == null) {
                 log.debug("[SEKTOREL-KARSILASTIRMA] Sektör bulunamadı: {}", code);
                 return builder.build();
             }
+            String sektorAdi = sektorBilgisi[0];
+            String sektorSlug = sektorBilgisi[1]; // null olabilir (MCP fallback)
             builder.sektor(sektorAdi);
 
-            // 2. Sektördeki hisselerin listesini al
-            List<String> sektorHisseleri = findSectorStocks(sektorAdi);
+            // 2. Sektördeki hisselerin listesini al (slug varsa slug ile, yoksa displayName ile)
+            List<String> sektorHisseleri = findSectorStocks(sektorAdi, sektorSlug);
             if (sektorHisseleri.isEmpty()) {
                 log.debug("[SEKTOREL-KARSILASTIRMA] Sektörde hisse bulunamadı: sektor={}", sektorAdi);
                 return builder.build();
@@ -183,62 +206,214 @@ public class SektorelKarsilastirmaService {
     // ==================== Yardımcı Metodlar ====================
 
     /**
-     * Hissenin ait olduğu sektör adını bulur.
+     * Hissenin ait olduğu sektör bilgisini bulur (displayName + slug).
      *
-     * <p>SectorService üzerinden sektör özetlerini tarayarak hissenin
-     * bulunduğu sektörü belirler.</p>
+     * <p>İki aşamalı arama stratejisi:</p>
+     * <ol>
+     *   <li><b>Hızlı yol:</b> {@link SectorService#findSectorForStock(String)} —
+     *       TradingView taramasından oluşturulan stockToSectorMap üzerinden O(1) lookup.
+     *       Tüm ~700 BIST hissesini kapsar.</li>
+     *   <li><b>Yavaş yol (MCP fallback):</b> Fintables MCP {@code dokumanlarda_ara} ile
+     *       kurumsal bilgi kartından sektör bilgisi parse eder.</li>
+     * </ol>
      *
-     * @param stockCode hisse kodu
-     * @return sektör displayName veya {@code null}
+     * @param stockCode hisse kodu (ör: "GARAN", "A1CAP")
+     * @return {@code [displayName, slug]} dizisi — slug MCP fallback'te {@code null} olabilir;
+     *         bulunamazsa {@code null}
      */
-    private String findSectorForStock(String stockCode) {
-        if (sectorService == null) {
+    private String[] findSectorForStockWithSlug(String stockCode) {
+        // 1. Hızlı yol: SectorService stockToSectorMap (TradingView taramasından)
+        if (sectorService != null) {
+            try {
+                SectorService.StockSectorInfo info = sectorService.findSectorForStock(stockCode);
+                if (info != null) {
+                    log.debug("[SEKTOREL-KARSILASTIRMA] Sektör bulundu (stockToSectorMap): {}→{}",
+                            stockCode, info.displayName());
+                    return new String[]{info.displayName(), info.slug()};
+                }
+            } catch (Exception e) {
+                log.debug("[SEKTOREL-KARSILASTIRMA] stockToSectorMap arama hatası: {}", stockCode, e);
+            }
+        }
+
+        // 2. Yavaş yol (MCP fallback): Fintables kurumsal bilgi kartından sektör bilgisi
+        String mcpSektor = findSectorFromMcp(stockCode);
+        if (mcpSektor != null) {
+            return new String[]{mcpSektor, null};
+        }
+
+        log.debug("[SEKTOREL-KARSILASTIRMA] Hisse sektörü bulunamadı: {}", stockCode);
+        return null;
+    }
+
+    /**
+     * Fintables MCP kurumsal bilgi kartından sektör bilgisini alır.
+     *
+     * <p>MCP {@code dokumanlarda_ara} ile kurumsal bilgi kartını arar,
+     * chunk içeriğinden {@code **Sektör:** XXX} satırını regex ile parse eder.</p>
+     *
+     * <p>MCP token geçersizse veya herhangi bir hata oluşursa graceful degradation
+     * ile {@code null} döner.</p>
+     *
+     * @param stockCode hisse kodu (ör: "A1CAP")
+     * @return sektör adı (ör: "MALİ KURULUŞLAR / ARACI KURUMLAR") veya {@code null}
+     */
+    private String findSectorFromMcp(String stockCode) {
+        if (fintablesMcpClient == null || fintablesMcpTokenStore == null) {
+            return null;
+        }
+
+        if (!fintablesMcpTokenStore.isTokenValid()) {
+            log.debug("[SEKTOREL-KARSILASTIRMA] MCP token geçersiz, sektör araması atlanıyor: {}", stockCode);
             return null;
         }
 
         try {
-            List<SectorSummaryDto> summaries = sectorService.getSectorSummaries();
-            for (SectorSummaryDto summary : summaries) {
-                if (summary.getTopStocks() != null) {
-                    for (SectorSummaryDto.TopStockInfo stock : summary.getTopStocks()) {
-                        if (stockCode.equalsIgnoreCase(stock.getTicker())) {
-                            return summary.getDisplayName();
+            // Kurumsal bilgi kartını ara
+            String filter = "dokuman_tipi = \"kurumsal_bilgi_karti\" AND iliskili_semboller = \""
+                    + stockCode.toUpperCase().trim() + "\"";
+            JsonNode searchResult = fintablesMcpClient.dokumanlardaAra(
+                    "Sektör bilgisi: " + stockCode, "", filter, 1);
+
+            if (searchResult == null) {
+                return null;
+            }
+
+            // Arama sonucundan chunk ID'leri çıkar
+            List<String> chunkIds = extractChunkIds(searchResult);
+            if (chunkIds.isEmpty()) {
+                log.debug("[SEKTOREL-KARSILASTIRMA] MCP'de kurumsal bilgi kartı bulunamadı: {}", stockCode);
+                return null;
+            }
+
+            // Chunk içeriklerini yükle
+            JsonNode chunkResult = fintablesMcpClient.dokumanChunkYukle(chunkIds);
+            if (chunkResult == null) {
+                return null;
+            }
+
+            // Chunk content'ten sektör bilgisini parse et
+            String sektor = parseSektorFromChunks(chunkResult);
+            if (sektor != null) {
+                log.debug("[SEKTOREL-KARSILASTIRMA] Sektör bulundu (MCP): {}→{}", stockCode, sektor);
+            }
+            return sektor;
+
+        } catch (Exception e) {
+            log.warn("[SEKTOREL-KARSILASTIRMA] MCP sektör araması hatası: {}", stockCode, e);
+            return null;
+        }
+    }
+
+    /**
+     * MCP arama sonucundan chunk ID listesini çıkarır.
+     *
+     * <p>JSON-RPC result içindeki content dizisinden text alanlarını okuyarak
+     * chunk ID'lerini toplar.</p>
+     *
+     * @param searchResult MCP {@code dokumanlarda_ara} sonucu
+     * @return chunk ID listesi, yoksa boş liste
+     */
+    private List<String> extractChunkIds(JsonNode searchResult) {
+        List<String> ids = new ArrayList<>();
+        try {
+            // result → content dizisi
+            JsonNode content = searchResult.path("content");
+            if (content.isArray()) {
+                for (JsonNode item : content) {
+                    String text = item.path("text").asText("");
+                    if (!text.isBlank()) {
+                        // Text genellikle JSON formatında, chunk_id alanlarını içerir
+                        JsonNode parsed = objectMapper.readTree(text);
+                        if (parsed.isArray()) {
+                            for (JsonNode doc : parsed) {
+                                String chunkId = doc.path("chunk_id").asText(null);
+                                if (chunkId == null) {
+                                    chunkId = doc.path("id").asText(null);
+                                }
+                                if (chunkId != null) {
+                                    ids.add(chunkId);
+                                }
+                            }
+                        } else if (parsed.isObject()) {
+                            String chunkId = parsed.path("chunk_id").asText(null);
+                            if (chunkId == null) {
+                                chunkId = parsed.path("id").asText(null);
+                            }
+                            if (chunkId != null) {
+                                ids.add(chunkId);
+                            }
                         }
                     }
                 }
             }
         } catch (Exception e) {
-            log.debug("[SEKTOREL-KARSILASTIRMA] Sektör arama hatası: {}", stockCode, e);
+            log.debug("[SEKTOREL-KARSILASTIRMA] Chunk ID parse hatası", e);
         }
+        return ids;
+    }
 
-        // Top-3'te bulunamazsa sektör karşılaştırması yapılamaz
-        // (44 sektörü sırayla taramak çok yavaş, performans sorunu)
-        log.debug("[SEKTOREL-KARSILASTIRMA] Hisse sektörü bulunamadı (top-3'te yok): {}", stockCode);
+    /**
+     * MCP chunk içeriklerinden {@code **Sektör:** XXX} satırını parse eder.
+     *
+     * @param chunkResult MCP {@code dokuman_chunk_yukle} sonucu
+     * @return sektör adı veya {@code null}
+     */
+    private String parseSektorFromChunks(JsonNode chunkResult) {
+        try {
+            JsonNode content = chunkResult.path("content");
+            if (content.isArray()) {
+                for (JsonNode item : content) {
+                    String text = item.path("text").asText("");
+                    Matcher matcher = SEKTOR_PATTERN.matcher(text);
+                    if (matcher.find()) {
+                        return matcher.group(1).trim();
+                    }
+                }
+            }
+        } catch (Exception e) {
+            log.debug("[SEKTOREL-KARSILASTIRMA] Sektör parse hatası", e);
+        }
         return null;
     }
 
     /**
      * Belirtilen sektördeki hisse kodlarını bulur.
      *
-     * @param sektorAdi sektör displayName
+     * <p>Slug mevcutsa doğrudan {@link SectorService#getSectorStocks(String)} ile alır.
+     * Slug yoksa (MCP fallback durumu) displayName ile eşleşen sektörün slug'ını bulur.</p>
+     *
+     * @param sektorAdi  sektör displayName
+     * @param sektorSlug sektör slug'ı (nullable — MCP fallback'te null olabilir)
      * @return hisse kodu listesi, yoksa boş liste
      */
-    private List<String> findSectorStocks(String sektorAdi) {
+    private List<String> findSectorStocks(String sektorAdi, String sektorSlug) {
         if (sectorService == null) {
             return Collections.emptyList();
         }
 
         try {
-            List<SectorSummaryDto> summaries = sectorService.getSectorSummaries();
-            for (SectorSummaryDto summary : summaries) {
-                if (sektorAdi.equalsIgnoreCase(summary.getDisplayName())) {
-                    var stocks = sectorService.getSectorStocks(summary.getSlug());
-                    if (stocks != null) {
-                        return stocks.stream()
-                                .map(s -> s.getTicker())
-                                .filter(Objects::nonNull)
-                                .collect(Collectors.toList());
+            // Slug varsa doğrudan kullan
+            String slug = sektorSlug;
+
+            // Slug yoksa displayName ile eşleşen sektörün slug'ını bul
+            if (slug == null) {
+                List<SectorSummaryDto> summaries = sectorService.getSectorSummaries();
+                for (SectorSummaryDto summary : summaries) {
+                    if (sektorAdi.equalsIgnoreCase(summary.getDisplayName())) {
+                        slug = summary.getSlug();
+                        break;
                     }
+                }
+            }
+
+            if (slug != null) {
+                var stocks = sectorService.getSectorStocks(slug);
+                if (stocks != null) {
+                    return stocks.stream()
+                            .map(s -> s.getTicker())
+                            .filter(Objects::nonNull)
+                            .collect(Collectors.toList());
                 }
             }
         } catch (Exception e) {
