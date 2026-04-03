@@ -128,7 +128,7 @@ public class GuidanceSyncJob {
         log.info("[GUIDANCE-SYNC] Başlıyor: tarih={}", today);
 
         try {
-            String sql = "SELECT * FROM guidance ORDER BY yil DESC, hisse_senedi_kodu ASC";
+            String sql = "SELECT DISTINCT hisse_senedi_kodu, yil FROM guidance ORDER BY hisse_senedi_kodu, yil DESC";
 
             JsonNode result = mcpClient.veriSorgula(sql, "Şirket guidance verileri");
 
