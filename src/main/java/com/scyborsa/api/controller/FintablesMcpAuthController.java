@@ -5,9 +5,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.scyborsa.api.config.FintablesMcpConfig;
 import com.scyborsa.api.service.client.FintablesMcpClient;
 import com.scyborsa.api.service.client.FintablesMcpTokenStore;
+import com.scyborsa.api.service.enrichment.*;
 import com.scyborsa.api.utils.ProfileUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -26,6 +28,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.SecureRandom;
 import java.util.Base64;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -65,6 +68,38 @@ public class FintablesMcpAuthController {
 
     /** Profil kontrol yardımcısı. */
     private final ProfileUtils profileUtils;
+
+    /** Açığa satış sync job. */
+    @Autowired(required = false)
+    private AcigaSatisSyncJob acigaSatisSyncJob;
+
+    /** VBTS tedbir sync job. */
+    @Autowired(required = false)
+    private VbtsTedbirSyncJob vbtsTedbirSyncJob;
+
+    /** Hedef fiyat sync job. */
+    @Autowired(required = false)
+    private HedefFiyatSyncJob hedefFiyatSyncJob;
+
+    /** Guidance sync job. */
+    @Autowired(required = false)
+    private GuidanceSyncJob guidanceSyncJob;
+
+    /** Halka arz sync job. */
+    @Autowired(required = false)
+    private HalkaArzSyncJob halkaArzSyncJob;
+
+    /** Finansal oran sync job. */
+    @Autowired(required = false)
+    private FinansalOranSyncJob finansalOranSyncJob;
+
+    /** Fon portföy sync job. */
+    @Autowired(required = false)
+    private FonPortfoySyncJob fonPortfoySyncJob;
+
+    /** Finansal tablo sync job. */
+    @Autowired(required = false)
+    private FinansalTabloSyncJob finansalTabloSyncJob;
 
     /** State → code_verifier eşleştirmesi (PKCE akışı için). */
     private final ConcurrentHashMap<String, String> pkceStore = new ConcurrentHashMap<>();
@@ -247,6 +282,168 @@ public class FintablesMcpAuthController {
             return ResponseEntity.status(500).body(Map.of("error", e.getMessage()));
         }
     }
+
+    // ======================== Manuel Sync Tetikleme Endpoint'leri ========================
+
+    /**
+     * Tüm Fintables sync job'ları manuel olarak tetikler.
+     *
+     * <p>Her job'un {@code forceSync()} metodunu sırayla çağırır.
+     * Guard clause'ları ve idempotent kontrolleri atlanır.</p>
+     *
+     * @return her job için sonuç durumu (OK veya ERROR)
+     */
+    @GetMapping("/trigger/all")
+    public ResponseEntity<?> triggerAllSync() {
+        if (!tokenStore.isTokenValid()) {
+            return ResponseEntity.badRequest()
+                    .body(Map.of("error", "Fintables MCP token geçersiz"));
+        }
+
+        Map<String, String> results = new LinkedHashMap<>();
+
+        triggerJob("acigaSatis", acigaSatisSyncJob, results);
+        triggerJob("vbtsTedbir", vbtsTedbirSyncJob, results);
+        triggerJob("hedefFiyat", hedefFiyatSyncJob, results);
+        triggerJob("guidance", guidanceSyncJob, results);
+        triggerJob("halkaArz", halkaArzSyncJob, results);
+        triggerJob("finansalOran", finansalOranSyncJob, results);
+        triggerJob("fonPortfoy", fonPortfoySyncJob, results);
+        triggerJob("finansalTablo", finansalTabloSyncJob, results);
+
+        return ResponseEntity.ok(results);
+    }
+
+    /**
+     * Açığa satış sync job'ını manuel tetikler.
+     *
+     * @return sonuç durumu
+     */
+    @GetMapping("/trigger/aciga-satis")
+    public ResponseEntity<?> triggerAcigaSatis() {
+        return triggerSingleJob("acigaSatis", acigaSatisSyncJob);
+    }
+
+    /**
+     * VBTS tedbir sync job'ını manuel tetikler.
+     *
+     * @return sonuç durumu
+     */
+    @GetMapping("/trigger/vbts")
+    public ResponseEntity<?> triggerVbtsTedbir() {
+        return triggerSingleJob("vbtsTedbir", vbtsTedbirSyncJob);
+    }
+
+    /**
+     * Hedef fiyat sync job'ını manuel tetikler.
+     *
+     * @return sonuç durumu
+     */
+    @GetMapping("/trigger/hedef-fiyat")
+    public ResponseEntity<?> triggerHedefFiyat() {
+        return triggerSingleJob("hedefFiyat", hedefFiyatSyncJob);
+    }
+
+    /**
+     * Guidance sync job'ını manuel tetikler.
+     *
+     * @return sonuç durumu
+     */
+    @GetMapping("/trigger/guidance")
+    public ResponseEntity<?> triggerGuidance() {
+        return triggerSingleJob("guidance", guidanceSyncJob);
+    }
+
+    /**
+     * Halka arz sync job'ını manuel tetikler.
+     *
+     * @return sonuç durumu
+     */
+    @GetMapping("/trigger/halka-arz")
+    public ResponseEntity<?> triggerHalkaArz() {
+        return triggerSingleJob("halkaArz", halkaArzSyncJob);
+    }
+
+    /**
+     * Finansal oran sync job'ını manuel tetikler.
+     *
+     * @return sonuç durumu
+     */
+    @GetMapping("/trigger/finansal-oran")
+    public ResponseEntity<?> triggerFinansalOran() {
+        return triggerSingleJob("finansalOran", finansalOranSyncJob);
+    }
+
+    /**
+     * Fon portföy sync job'ını manuel tetikler.
+     *
+     * @return sonuç durumu
+     */
+    @GetMapping("/trigger/fon-portfoy")
+    public ResponseEntity<?> triggerFonPortfoy() {
+        return triggerSingleJob("fonPortfoy", fonPortfoySyncJob);
+    }
+
+    /**
+     * Finansal tablo sync job'ını manuel tetikler.
+     *
+     * @return sonuç durumu
+     */
+    @GetMapping("/trigger/finansal-tablo")
+    public ResponseEntity<?> triggerFinansalTablo() {
+        return triggerSingleJob("finansalTablo", finansalTabloSyncJob);
+    }
+
+    /**
+     * Tek bir sync job'ı tetikler ve sonuç döndürür.
+     *
+     * @param name job adı
+     * @param job  çalıştırılacak runnable (forceSync çağrısı)
+     * @return başarı/hata response
+     */
+    private ResponseEntity<?> triggerSingleJob(String name, Object job) {
+        if (!tokenStore.isTokenValid()) {
+            return ResponseEntity.badRequest()
+                    .body(Map.of("error", "Fintables MCP token geçersiz"));
+        }
+        if (job == null) {
+            return ResponseEntity.badRequest()
+                    .body(Map.of("error", name + " job bean mevcut değil"));
+        }
+
+        Map<String, String> results = new LinkedHashMap<>();
+        triggerJob(name, job, results);
+        return ResponseEntity.ok(results);
+    }
+
+    /**
+     * Bir sync job'ı çalıştırır ve sonucunu results map'e yazar.
+     *
+     * @param name    job adı
+     * @param job     job nesnesi (forceSync metodu çağrılır)
+     * @param results sonuç map'i
+     */
+    private void triggerJob(String name, Object job, Map<String, String> results) {
+        if (job == null) {
+            results.put(name, "SKIP: bean mevcut değil");
+            return;
+        }
+        try {
+            if (job instanceof AcigaSatisSyncJob j) { j.forceSync(); }
+            else if (job instanceof VbtsTedbirSyncJob j) { j.forceSync(); }
+            else if (job instanceof HedefFiyatSyncJob j) { j.forceSync(); }
+            else if (job instanceof GuidanceSyncJob j) { j.forceSync(); }
+            else if (job instanceof HalkaArzSyncJob j) { j.forceSync(); }
+            else if (job instanceof FinansalOranSyncJob j) { j.forceSync(); }
+            else if (job instanceof FonPortfoySyncJob j) { j.forceSync(); }
+            else if (job instanceof FinansalTabloSyncJob j) { j.forceSync(); }
+            results.put(name, "OK");
+        } catch (Exception e) {
+            results.put(name, "ERROR: " + e.getMessage());
+        }
+    }
+
+    // ======================== PKCE Helper Metodları ========================
 
     /**
      * PKCE code_verifier üretir (43-128 karakter, URL-safe).

@@ -75,8 +75,9 @@ public class KapMcpService {
         }
 
         try {
-            String query = "kap_bildirim " + stockCode;
-            JsonNode result = mcpClient.dokumanlardaAra(query);
+            String filter = "dokuman_tipi = \"kap_haberi\" AND iliskili_semboller = \"" + stockCode + "\"";
+            JsonNode result = mcpClient.dokumanlardaAra(
+                    "KAP haberleri: " + stockCode, "", filter, limit);
 
             return parseHaberSonuclari(result, stockCode, limit);
         } catch (Exception e) {
@@ -167,8 +168,9 @@ public class KapMcpService {
         }
 
         try {
-            String query = "kap_haber_eki " + kapBildirimId;
-            JsonNode result = mcpClient.dokumanlardaAra(query);
+            String filter = "dokuman_tipi = \"kap_haber_eki\" AND kap_bildirim_id IN [" + kapBildirimId + "]";
+            JsonNode result = mcpClient.dokumanlardaAra(
+                    "KAP haber eki: " + kapBildirimId, "", filter, 20);
             return parseChunkIds(result);
         } catch (Exception e) {
             log.error("[KAP-MCP] Haber eki araması başarısız, kapBildirimId={}: {}",

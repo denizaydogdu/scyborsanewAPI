@@ -97,6 +97,22 @@ public class AcigaSatisSyncJob {
     }
 
     /**
+     * Guard clause'ları ve idempotent kontrolü atlayarak senkronizasyonu zorla tetikler.
+     *
+     * <p>Manuel tetikleme ve test amaçlıdır. Bugünkü mevcut cache kaydını siler
+     * ve yeniden senkronizasyon yapar.</p>
+     */
+    public void forceSync() {
+        log.info("[ACIGA-SATIS-SYNC] Manuel senkronizasyon başlatıldı");
+        LocalDate today = LocalDate.now(ISTANBUL_ZONE);
+        // Mevcut kaydı sil (idempotent bypass)
+        cacheRepository.findByStockCodeAndCacheDateAndDataType(
+                SYSTEM_STOCK_CODE, today, EnrichmentDataTypeEnum.ACIGA_SATIS)
+                .ifPresent(cacheRepository::delete);
+        doSync();
+    }
+
+    /**
      * Asıl senkronizasyon mantığı.
      *
      * <p>Fintables MCP'den günün açığa satış verilerini SQL ile çeker,

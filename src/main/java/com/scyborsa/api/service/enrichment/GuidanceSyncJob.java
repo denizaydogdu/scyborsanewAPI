@@ -93,6 +93,21 @@ public class GuidanceSyncJob {
     }
 
     /**
+     * Guard clause'ları ve idempotent kontrolü atlayarak senkronizasyonu zorla tetikler.
+     *
+     * <p>Manuel tetikleme ve test amaçlıdır. Bugünkü mevcut cache kaydını siler
+     * ve yeniden senkronizasyon yapar.</p>
+     */
+    public void forceSync() {
+        log.info("[GUIDANCE-SYNC] Manuel senkronizasyon başlatıldı");
+        LocalDate today = LocalDate.now(ISTANBUL_ZONE);
+        cacheRepository.findByStockCodeAndCacheDateAndDataType(
+                SYSTEM_STOCK_CODE, today, EnrichmentDataTypeEnum.GUIDANCE)
+                .ifPresent(cacheRepository::delete);
+        doSync();
+    }
+
+    /**
      * Asıl senkronizasyon mantığı.
      *
      * <p>Fintables MCP'den tüm guidance kayıtlarını SQL ile çeker,

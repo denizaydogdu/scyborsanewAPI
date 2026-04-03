@@ -107,6 +107,21 @@ public class FinansalTabloSyncJob {
     }
 
     /**
+     * Guard clause'ları ve idempotent kontrolü atlayarak senkronizasyonu zorla tetikler.
+     *
+     * <p>Manuel tetikleme ve test amaçlıdır. Bugünkü mevcut cache kaydını siler
+     * ve yeniden senkronizasyon yapar.</p>
+     */
+    public void forceSync() {
+        log.info("[FINANSAL-TABLO-SYNC] Manuel senkronizasyon başlatıldı");
+        LocalDate today = LocalDate.now(ISTANBUL_ZONE);
+        cacheRepository.findByStockCodeAndCacheDateAndDataType(
+                SYSTEM_STOCK_CODE, today, EnrichmentDataTypeEnum.FINANSAL_TABLO)
+                .ifPresent(cacheRepository::delete);
+        doSync();
+    }
+
+    /**
      * Asıl senkronizasyon mantığı.
      *
      * <p>Fintables MCP'den 3 farklı tablodan (bilanço, gelir tablosu, nakit akım)

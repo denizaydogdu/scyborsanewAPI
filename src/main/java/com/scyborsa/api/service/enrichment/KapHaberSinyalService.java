@@ -78,8 +78,9 @@ public class KapHaberSinyalService {
         }
 
         try {
-            String query = stockCode + " KAP bildirimi";
-            JsonNode result = mcpClient.dokumanlardaAra(query);
+            String filter = "dokuman_tipi = \"kap_haberi\" AND iliskili_semboller = \"" + stockCode + "\"";
+            JsonNode result = mcpClient.dokumanlardaAra(
+                    "KAP haber sinyalleri: " + stockCode, "", filter, 20);
 
             if (result == null) {
                 return Collections.emptyList();

@@ -88,6 +88,21 @@ public class HalkaArzSyncJob {
     }
 
     /**
+     * Guard clause'ları ve idempotent kontrolü atlayarak senkronizasyonu zorla tetikler.
+     *
+     * <p>Manuel tetikleme ve test amaçlıdır. Bugünkü mevcut cache kaydını siler
+     * ve yeniden senkronizasyon yapar.</p>
+     */
+    public void forceSync() {
+        log.info("[HALKA-ARZ-SYNC] Manuel senkronizasyon başlatıldı");
+        LocalDate today = LocalDate.now(ISTANBUL_ZONE);
+        cacheRepository.findByStockCodeAndCacheDateAndDataType(
+                SYSTEM_STOCK_CODE, today, EnrichmentDataTypeEnum.HALKA_ARZ)
+                .ifPresent(cacheRepository::delete);
+        doSync();
+    }
+
+    /**
      * Asıl senkronizasyon mantığı.
      *
      * <p>Fintables MCP'den son 100 halka arz kaydını SQL ile çeker,

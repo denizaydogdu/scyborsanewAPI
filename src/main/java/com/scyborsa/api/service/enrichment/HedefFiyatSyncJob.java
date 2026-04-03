@@ -87,6 +87,21 @@ public class HedefFiyatSyncJob {
     }
 
     /**
+     * Guard clause'ları ve idempotent kontrolü atlayarak senkronizasyonu zorla tetikler.
+     *
+     * <p>Manuel tetikleme ve test amaçlıdır. Bugünkü mevcut cache kaydını siler
+     * ve yeniden senkronizasyon yapar.</p>
+     */
+    public void forceSync() {
+        log.info("[HEDEF-FIYAT-SYNC] Manuel senkronizasyon başlatıldı");
+        LocalDate today = LocalDate.now(ISTANBUL_ZONE);
+        cacheRepository.findByStockCodeAndCacheDateAndDataType(
+                SYSTEM_STOCK_CODE, today, EnrichmentDataTypeEnum.HEDEF_FIYAT)
+                .ifPresent(cacheRepository::delete);
+        doSync();
+    }
+
+    /**
      * Asıl senkronizasyon mantığı.
      *
      * <p>Fintables MCP'den son 500 hedef fiyat kaydını SQL ile çeker,

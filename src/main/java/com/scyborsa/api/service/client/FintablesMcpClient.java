@@ -108,9 +108,37 @@ public class FintablesMcpClient {
     }
 
     /**
-     * Doküman havuzunda full-text arama yapar.
+     * Doküman havuzunda full-text arama yapar (tam parametreli versiyon).
      *
-     * <p>Faaliyet raporları, KAP haberleri ve diğer metinsel içeriklerde arama yapar.</p>
+     * <p>Faaliyet raporları, KAP haberleri ve diğer metinsel içeriklerde
+     * purpose, query, filter ve sayfa_basi parametreleri ile arama yapar.</p>
+     *
+     * @param purpose   aramanın amacı (zorunlu)
+     * @param query     aranacak metin (opsiyonel, null/blank ise gönderilmez)
+     * @param filter    Meilisearch filter ifadesi (opsiyonel, ör: {@code iliskili_semboller = "THYAO"})
+     * @param sayfaBasi sayfa başına sonuç sayısı (max 50)
+     * @return JSON-RPC result alanı (arama sonuçları)
+     * @throws IllegalStateException token yoksa veya süresi dolmuşsa
+     * @throws RuntimeException      MCP çağrısı başarısız olursa
+     */
+    public JsonNode dokumanlardaAra(String purpose, String query, String filter, int sayfaBasi) {
+        Map<String, Object> arguments = new HashMap<>();
+        arguments.put("purpose", purpose);
+        if (query != null && !query.isBlank()) {
+            arguments.put("query", query);
+        }
+        if (filter != null && !filter.isBlank()) {
+            arguments.put("filter", filter);
+        }
+        arguments.put("sayfa_basi", sayfaBasi);
+        return callTool("dokumanlarda_ara", arguments);
+    }
+
+    /**
+     * Doküman havuzunda full-text arama yapar (geriye uyumlu basit versiyon).
+     *
+     * <p>Faaliyet raporları, KAP haberleri ve diğer metinsel içeriklerde arama yapar.
+     * İç olarak {@link #dokumanlardaAra(String, String, String, int)} metodunu çağırır.</p>
      *
      * @param query arama sorgusu
      * @return JSON-RPC result alanı (arama sonuçları)
@@ -118,8 +146,7 @@ public class FintablesMcpClient {
      * @throws RuntimeException      MCP çağrısı başarısız olursa
      */
     public JsonNode dokumanlardaAra(String query) {
-        Map<String, Object> arguments = Map.of("query", query);
-        return callTool("dokumanlarda_ara", arguments);
+        return dokumanlardaAra(query, query, null, 8);
     }
 
     /**
