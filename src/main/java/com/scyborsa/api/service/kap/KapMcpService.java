@@ -1,6 +1,7 @@
 package com.scyborsa.api.service.kap;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.scyborsa.api.dto.fintables.KapMcpHaberDto;
 import com.scyborsa.api.service.client.FintablesMcpClient;
 import com.scyborsa.api.service.client.FintablesMcpTokenStore;
@@ -43,6 +44,9 @@ public class KapMcpService {
             "sözleşme", "ihale", "yatırım", "kredi", "tahvil",
             "bedelsiz", "bedelli", "temettü"
     );
+
+    /** JSON parser. */
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     /** Fintables MCP istemcisi. Bean yoksa {@code null}. */
     @Autowired(required = false)
@@ -191,6 +195,9 @@ public class KapMcpService {
     /**
      * MCP arama sonuçlarını {@link KapMcpHaberDto} listesine dönüştürür.
      *
+     * <p>MCP response formatı: {@code content[0].text} içinde JSON string bulunur.
+     * JSON yapısı: {@code {"toplam":N, "sonuclar":[{document_title, highlight, ...}]}}</p>
+     *
      * @param result    MCP arama sonucu JSON
      * @param stockCode hisse kodu (filtreleme için)
      * @param limit     maksimum sonuç sayısı
@@ -199,69 +206,72 @@ public class KapMcpService {
     private List<KapMcpHaberDto> parseHaberSonuclari(JsonNode result, String stockCode, int limit) {
         List<KapMcpHaberDto> haberler = new ArrayList<>();
 
-        if (result == null || !result.isArray()) {
-            // content dizisi içinde text alanında JSON olabilir
-            if (result != null && result.has("content")) {
-                JsonNode content = result.get("content");
-                if (content.isArray()) {
-                    for (JsonNode item : content) {
-                        if (item.has("text")) {
-                            parseTextItem(item.get("text").asText(), stockCode, haberler, limit);
-                        }
-                        if (haberler.size() >= limit) break;
-                    }
-                }
+        String jsonText = extractTextFromResult(result);
+        if (jsonText == null || jsonText.isBlank()) return haberler;
+
+        try {
+            JsonNode root = objectMapper.readTree(jsonText);
+            JsonNode sonuclar = root.get("sonuclar");
+            if (sonuclar == null || !sonuclar.isArray()) return haberler;
+
+            for (JsonNode item : sonuclar) {
+                if (haberler.size() >= limit) break;
+
+                KapMcpHaberDto dto = KapMcpHaberDto.builder()
+                        .baslik(getTextSafe(item, "document_title"))
+                        .ozet(getTextSafe(item, "highlight"))
+                        .tarih(getTextSafe(item, "yayinlanma_tarihi_utc"))
+                        .bildirimTipi(getTextSafe(item, "kap_bildirim_tipi"))
+                        .hisseSenediKodu(stockCode)
+                        .chunkIds(extractChunkId(item))
+                        .build();
+                haberler.add(dto);
             }
-            return haberler;
-        }
-
-        for (JsonNode item : result) {
-            if (haberler.size() >= limit) break;
-
-            KapMcpHaberDto dto = KapMcpHaberDto.builder()
-                    .baslik(getTextSafe(item, "baslik"))
-                    .ozet(getTextSafe(item, "ozet"))
-                    .tarih(getTextSafe(item, "tarih"))
-                    .bildirimTipi(getTextSafe(item, "bildirim_tipi"))
-                    .hisseSenediKodu(stockCode)
-                    .chunkIds(parseChunkIdsFromItem(item))
-                    .build();
-            haberler.add(dto);
+        } catch (Exception e) {
+            log.warn("[KAP-MCP] JSON parse hatası: {}", e.getMessage());
         }
 
         return haberler;
     }
 
     /**
-     * MCP text yanıtını parse ederek haber listesine ekler.
+     * MCP result'tan text içeriğini çıkarır.
      *
-     * @param text      MCP text yanıtı
-     * @param stockCode hisse kodu
-     * @param haberler  hedef liste
-     * @param limit     maksimum sonuç
+     * <p>MCP response formatları:</p>
+     * <ul>
+     *   <li>{@code content[0].text} — standart MCP tool response</li>
+     *   <li>{@code text} — doğrudan text alanı</li>
+     *   <li>Diğer — toString fallback</li>
+     * </ul>
+     *
+     * @param result MCP sonucu
+     * @return text içeriği veya {@code null}
      */
-    private void parseTextItem(String text, String stockCode,
-                               List<KapMcpHaberDto> haberler, int limit) {
-        if (text == null || text.isBlank()) return;
+    private String extractTextFromResult(JsonNode result) {
+        if (result == null) return null;
 
-        // MCP sonuçları genellikle düz metin döner; basit parse
-        String[] satirlar = text.split("\n");
-        for (String satir : satirlar) {
-            if (haberler.size() >= limit) break;
-            satir = satir.trim();
-            if (satir.isEmpty()) continue;
-
-            KapMcpHaberDto dto = KapMcpHaberDto.builder()
-                    .baslik(satir.length() > 200 ? satir.substring(0, 200) : satir)
-                    .hisseSenediKodu(stockCode)
-                    .chunkIds(Collections.emptyList())
-                    .build();
-            haberler.add(dto);
+        // content[0].text formatı (standart MCP response)
+        if (result.has("content") && result.get("content").isArray()) {
+            JsonNode content = result.get("content");
+            if (!content.isEmpty() && content.get(0).has("text")) {
+                return content.get(0).get("text").asText();
+            }
         }
+
+        // Doğrudan text alanı
+        if (result.has("text")) {
+            return result.get("text").asText();
+        }
+
+        // Fallback: tüm JSON'u string olarak dön
+        return result.toString();
     }
 
     /**
      * Chunk içeriklerini birleştirir.
+     *
+     * <p>MCP {@code dokuman_chunk_yukle} response'u da {@code content[0].text} formatında
+     * JSON döndürür. İçerideki chunk'ları birleştirir.</p>
      *
      * @param result MCP chunk yükleme sonucu
      * @return birleştirilmiş metin
@@ -269,24 +279,46 @@ public class KapMcpService {
     private String parseChunkIcerikleri(JsonNode result) {
         if (result == null) return "";
 
-        StringBuilder sb = new StringBuilder();
+        String jsonText = extractTextFromResult(result);
+        if (jsonText == null || jsonText.isBlank()) return "";
 
-        if (result.has("content") && result.get("content").isArray()) {
-            for (JsonNode item : result.get("content")) {
-                if (item.has("text")) {
-                    if (sb.length() > 0) sb.append("\n\n");
-                    sb.append(item.get("text").asText());
+        // Önce JSON olarak parse etmeyi dene (chunk listesi dönebilir)
+        try {
+            JsonNode root = objectMapper.readTree(jsonText);
+
+            // Chunk listesi: sonuclar veya chunks array
+            JsonNode chunks = root.has("sonuclar") ? root.get("sonuclar")
+                    : root.has("chunks") ? root.get("chunks") : null;
+
+            if (chunks != null && chunks.isArray()) {
+                StringBuilder sb = new StringBuilder();
+                for (JsonNode chunk : chunks) {
+                    String content = chunk.has("content") ? chunk.get("content").asText()
+                            : chunk.has("text") ? chunk.get("text").asText() : null;
+                    if (content != null && !content.isBlank()) {
+                        if (sb.length() > 0) sb.append("\n\n");
+                        sb.append(content);
+                    }
                 }
+                if (sb.length() > 0) return sb.toString();
             }
-        } else if (result.isTextual()) {
-            sb.append(result.asText());
+
+            // Tek bir text alanı varsa doğrudan dön
+            if (root.has("text")) {
+                return root.get("text").asText();
+            }
+        } catch (Exception e) {
+            // JSON değilse düz metin olarak dön
+            log.debug("[KAP-MCP] Chunk içerik JSON parse edilemedi, düz metin olarak kullanılıyor");
         }
 
-        return sb.toString();
+        return jsonText;
     }
 
     /**
      * MCP arama sonucundan chunk ID'lerini çıkarır.
+     *
+     * <p>Response'taki {@code sonuclar} array'inden {@code id} alanlarını toplar.</p>
      *
      * @param result MCP arama sonucu
      * @return chunk ID listesi
@@ -295,54 +327,41 @@ public class KapMcpService {
         List<String> ids = new ArrayList<>();
         if (result == null) return ids;
 
-        if (result.has("content") && result.get("content").isArray()) {
-            for (JsonNode item : result.get("content")) {
-                if (item.has("text")) {
-                    // Text içinden chunk_id satırlarını parse et
-                    String text = item.get("text").asText();
-                    if (text.contains("chunk_id")) {
-                        // Basit parse: satır bazlı chunk_id çıkar
-                        for (String line : text.split("\n")) {
-                            line = line.trim();
-                            if (line.startsWith("chunk_id:")) {
-                                String id = line.substring("chunk_id:".length()).trim();
-                                if (!id.isEmpty()) ids.add(id);
-                            }
-                        }
+        String jsonText = extractTextFromResult(result);
+        if (jsonText == null || jsonText.isBlank()) return ids;
+
+        try {
+            JsonNode root = objectMapper.readTree(jsonText);
+            JsonNode sonuclar = root.get("sonuclar");
+            if (sonuclar != null && sonuclar.isArray()) {
+                for (JsonNode item : sonuclar) {
+                    String id = getTextSafe(item, "id");
+                    if (id != null && !id.isBlank()) {
+                        ids.add(id);
                     }
                 }
             }
-        }
-
-        if (result.isArray()) {
-            for (JsonNode item : result) {
-                if (item.has("chunk_id")) {
-                    ids.add(item.get("chunk_id").asText());
-                }
-            }
+        } catch (Exception e) {
+            log.warn("[KAP-MCP] Chunk ID parse hatası: {}", e.getMessage());
         }
 
         return ids;
     }
 
     /**
-     * Tek bir JSON item'dan chunk ID listesini çıkarır.
+     * Tek bir sonuç item'dan chunk ID çıkarır.
      *
-     * @param item JSON nodu
-     * @return chunk ID listesi
+     * @param item sonuç JSON nodu
+     * @return chunk ID listesi (tek elemanlı veya boş)
      */
-    private List<String> parseChunkIdsFromItem(JsonNode item) {
+    private List<String> extractChunkId(JsonNode item) {
         List<String> ids = new ArrayList<>();
         if (item == null) return ids;
 
-        if (item.has("chunk_ids") && item.get("chunk_ids").isArray()) {
-            for (JsonNode idNode : item.get("chunk_ids")) {
-                ids.add(idNode.asText());
-            }
-        } else if (item.has("chunk_id")) {
-            ids.add(item.get("chunk_id").asText());
+        String id = getTextSafe(item, "id");
+        if (id != null && !id.isBlank()) {
+            ids.add(id);
         }
-
         return ids;
     }
 
@@ -351,7 +370,7 @@ public class KapMcpService {
      *
      * @param node  JSON nodu
      * @param field alan adı
-     * @return alan değeri veya null
+     * @return alan değeri veya {@code null}
      */
     private String getTextSafe(JsonNode node, String field) {
         if (node == null || !node.has(field) || node.get(field).isNull()) {

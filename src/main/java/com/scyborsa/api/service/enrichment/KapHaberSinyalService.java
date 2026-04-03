@@ -1,6 +1,7 @@
 package com.scyborsa.api.service.enrichment;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.scyborsa.api.dto.fintables.KapHaberSinyalDto;
 import com.scyborsa.api.service.client.FintablesMcpClient;
 import com.scyborsa.api.service.client.FintablesMcpTokenStore;
@@ -43,6 +44,9 @@ public class KapHaberSinyalService {
 
     /** StockCode regex doğrulama (SQL injection koruması). */
     private static final Pattern STOCK_CODE_PATTERN = Pattern.compile("^[A-Z0-9]{1,10}$");
+
+    /** JSON parser. */
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     /** Tarih çıkarma regex (yyyy-MM-dd veya dd.MM.yyyy formatları). */
     private static final Pattern DATE_PATTERN_ISO = Pattern.compile("(\\d{4}-\\d{2}-\\d{2})");
@@ -96,6 +100,9 @@ public class KapHaberSinyalService {
     /**
      * MCP doküman arama sonucunu parse ederek haber sinyallerine dönüştürür.
      *
+     * <p>MCP response formatı: {@code content[0].text} içinde JSON string bulunur.
+     * JSON yapısı: {@code {"toplam":N, "sonuclar":[{document_title, highlight, yayinlanma_tarihi_utc, ...}]}}</p>
+     *
      * <p>Sadece son 30 gün içindeki sinyalleri döndürür. Tarih parse edilemezse
      * sinyal dahil edilir (null tarih = yeni haber kabul edilir).</p>
      *
@@ -108,35 +115,44 @@ public class KapHaberSinyalService {
         LocalDate bugun = LocalDate.now(ISTANBUL_ZONE);
         LocalDate otuzGunOnce = bugun.minusDays(30);
 
-        // MCP result → content array → text alanlarından parse
-        JsonNode content = extractContent(result);
-        if (content == null || !content.isArray()) {
+        // MCP result → content[0].text → JSON string → sonuclar array
+        String jsonText = extractTextFromResult(result);
+        if (jsonText == null || jsonText.isBlank()) {
             return sinyaller;
         }
 
-        for (JsonNode item : content) {
-            try {
-                String text = item.has("text") ? item.get("text").asText() : item.asText();
-                if (text == null || text.isBlank()) {
-                    continue;
-                }
-
-                String textLower = text.toLowerCase();
-
-                // Hisse kodu ilgili mi kontrol et
-                if (!textLower.contains(stockCode.toLowerCase())) {
-                    continue;
-                }
-
-                // Metinden tarih çıkar
-                LocalDate haberTarihi = extractDate(text);
-
-                // Keyword bazlı sınıflandırma
-                siniflandir(stockCode, text, textLower,
-                        haberTarihi != null ? haberTarihi : bugun, sinyaller);
-            } catch (Exception e) {
-                log.debug("[KAP-SINYAL] Haber parse hatası", e);
+        try {
+            JsonNode root = objectMapper.readTree(jsonText);
+            JsonNode sonuclar = root.get("sonuclar");
+            if (sonuclar == null || !sonuclar.isArray()) {
+                return sinyaller;
             }
+
+            for (JsonNode item : sonuclar) {
+                try {
+                    // document_title + highlight birleştirerek keyword analizi yap
+                    String title = item.has("document_title") ? item.get("document_title").asText() : "";
+                    String highlight = item.has("highlight") ? item.get("highlight").asText() : "";
+                    String text = title + " " + highlight;
+
+                    if (text.isBlank()) continue;
+
+                    String textLower = text.toLowerCase();
+
+                    // Tarih: yayinlanma_tarihi_utc alanından çıkar
+                    String tarihStr = item.has("yayinlanma_tarihi_utc")
+                            ? item.get("yayinlanma_tarihi_utc").asText() : "";
+                    LocalDate haberTarihi = extractDate(tarihStr);
+
+                    // Keyword bazlı sınıflandırma
+                    siniflandir(stockCode, text, textLower,
+                            haberTarihi != null ? haberTarihi : bugun, sinyaller);
+                } catch (Exception e) {
+                    log.debug("[KAP-SINYAL] Haber item parse hatası", e);
+                }
+            }
+        } catch (Exception e) {
+            log.warn("[KAP-SINYAL] JSON parse hatası: {}", e.getMessage());
         }
 
         // Son 30 gün filtresi — null tarih = yeni haber kabul et (dahil et)
@@ -233,23 +249,46 @@ public class KapHaberSinyalService {
     }
 
     /**
-     * MCP result'tan content dizisini çıkarır.
+     * MCP result'tan text içeriğini çıkarır.
      *
-     * <p>JSON-RPC response formatı: {@code result.content[]} veya doğrudan array.</p>
+     * <p>MCP response formatları:</p>
+     * <ul>
+     *   <li>{@code content[0].text} — standart MCP tool response</li>
+     *   <li>{@code text} — doğrudan text alanı</li>
+     *   <li>Diğer — toString fallback</li>
+     * </ul>
      *
      * @param result MCP sonucu
-     * @return content JsonNode (array), yoksa {@code null}
+     * @return text içeriği veya {@code null}
      */
-    private JsonNode extractContent(JsonNode result) {
-        if (result.isArray()) {
-            return result;
+    private String extractTextFromResult(JsonNode result) {
+        if (result == null) return null;
+
+        // content[0].text formatı (standart MCP response)
+        if (result.has("content") && result.get("content").isArray()) {
+            JsonNode content = result.get("content");
+            if (!content.isEmpty() && content.get(0).has("text")) {
+                return content.get(0).get("text").asText();
+            }
         }
-        if (result.has("content")) {
-            return result.get("content");
+
+        // result.content formatı (nested)
+        if (result.has("result")) {
+            JsonNode inner = result.get("result");
+            if (inner.has("content") && inner.get("content").isArray()) {
+                JsonNode content = inner.get("content");
+                if (!content.isEmpty() && content.get(0).has("text")) {
+                    return content.get(0).get("text").asText();
+                }
+            }
         }
-        if (result.has("result") && result.get("result").has("content")) {
-            return result.get("result").get("content");
+
+        // Doğrudan text alanı
+        if (result.has("text")) {
+            return result.get("text").asText();
         }
-        return null;
+
+        // Fallback: tüm JSON'u string olarak dön
+        return result.toString();
     }
 }
