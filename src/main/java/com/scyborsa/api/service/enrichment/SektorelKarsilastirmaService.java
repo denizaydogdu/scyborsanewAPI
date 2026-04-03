@@ -97,34 +97,41 @@ public class SektorelKarsilastirmaService {
                 return builder.build();
             }
 
-            // 3. Tüm finansal oranları al
+            // 3. Bulk cache'den tüm finansal oranları al (sektör karşılaştırması için)
             List<FinansalOranDto> tumOranlar = finansalOranService != null
                     ? finansalOranService.getFinansalOranlar()
                     : Collections.emptyList();
 
-            if (tumOranlar.isEmpty()) {
+            // 4. Şirketin oranlarını al (hisse bazlı MCP fallback dahil)
+            List<FinansalOranDto> sirketOranListesi = finansalOranService != null
+                    ? finansalOranService.getHisseOranlar(code)
+                    : Collections.emptyList();
+
+            // En son dönemi bul: önce şirket verisinden, yoksa bulk cache'den
+            List<FinansalOranDto> donemKaynagi = !sirketOranListesi.isEmpty() ? sirketOranListesi : tumOranlar;
+            if (donemKaynagi.isEmpty()) {
                 log.debug("[SEKTOREL-KARSILASTIRMA] Finansal oran verisi yok");
                 return builder.build();
             }
 
-            // En son dönemi bul (tüm piyasa için)
-            int[] sonDonem = findLatestPeriod(tumOranlar);
+            int[] sonDonem = findLatestPeriod(donemKaynagi);
             if (sonDonem == null) {
                 return builder.build();
             }
             int yil = sonDonem[0], ay = sonDonem[1];
 
-            // 4. Şirketin oranlarını al
+            // Şirketin kendi oranlarını dönem bazlı çıkar
             Map<String, Double> sirketOranlari = new LinkedHashMap<>();
             for (String oranAdi : KARSILASTIRMA_ORANLARI) {
-                Double deger = findOranValue(tumOranlar, code, yil, ay, oranAdi);
+                Double deger = findOranValue(sirketOranListesi, code, yil, ay, oranAdi);
                 if (deger != null) {
                     sirketOranlari.put(oranAdi, Math.round(deger * 100.0) / 100.0);
                 }
             }
             builder.sirketOranlari(sirketOranlari);
 
-            // 5. Sektör oranlarını topla ve istatistik hesapla
+            // 5. Sektör oranlarını sadece bulk cache'den hesapla
+            // (Cache'de yoksa sektör kısmı boş kalır — kabul edilebilir)
             Map<String, Double> sektorOrtalama = new LinkedHashMap<>();
             Map<String, Double> sektorMedian = new LinkedHashMap<>();
             Map<String, String> pozisyon = new LinkedHashMap<>();

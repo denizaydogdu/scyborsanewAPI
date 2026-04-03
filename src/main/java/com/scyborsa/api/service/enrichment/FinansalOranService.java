@@ -103,7 +103,8 @@ public class FinansalOranService {
     /**
      * Belirtilen hisse için finansal oranları döndürür.
      *
-     * <p>Tüm finansal oranları alır ve hisse koduna göre filtreler.</p>
+     * <p>Önce cache'den filtreler. Cache'de bulunamazsa hisse bazlı MCP sorgusu
+     * ile canlı veri çeker (graceful degradation).</p>
      *
      * @param stockCode hisse kodu (ör: "GARAN")
      * @return ilgili hissenin finansal oranları, yoksa boş liste
@@ -112,15 +113,25 @@ public class FinansalOranService {
         if (stockCode == null || stockCode.isBlank()) {
             return Collections.emptyList();
         }
-        return getFinansalOranlar().stream()
+
+        // 1. Cache'den filtrele
+        List<FinansalOranDto> cached = getFinansalOranlar().stream()
                 .filter(dto -> stockCode.equalsIgnoreCase(dto.getHisseSenediKodu()))
                 .collect(Collectors.toList());
+
+        if (!cached.isEmpty()) {
+            return cached;
+        }
+
+        // 2. Cache'de yoksa hisse bazlı MCP fallback
+        return fetchHisseOranlarFromMcp(stockCode, null, null);
     }
 
     /**
      * Belirtilen hisse ve dönem için finansal oranları döndürür.
      *
-     * <p>Tüm finansal oranları alır ve hisse kodu, yıl ve aya göre filtreler.</p>
+     * <p>Önce cache'den filtreler. Cache'de bulunamazsa hisse bazlı MCP sorgusu
+     * ile canlı veri çeker (graceful degradation).</p>
      *
      * @param stockCode hisse kodu (ör: "GARAN")
      * @param yil       bilanço yılı (ör: 2025)
@@ -131,11 +142,72 @@ public class FinansalOranService {
         if (stockCode == null || stockCode.isBlank()) {
             return Collections.emptyList();
         }
-        return getFinansalOranlar().stream()
+
+        // 1. Cache'den filtrele
+        List<FinansalOranDto> cached = getFinansalOranlar().stream()
                 .filter(dto -> stockCode.equalsIgnoreCase(dto.getHisseSenediKodu())
                         && dto.getYil() != null && dto.getYil().equals(yil)
                         && dto.getAy() != null && dto.getAy().equals(ay))
                 .collect(Collectors.toList());
+
+        if (!cached.isEmpty()) {
+            return cached;
+        }
+
+        // 2. Cache'de yoksa hisse bazlı MCP fallback (yıl+ay filtreli)
+        return fetchHisseOranlarFromMcp(stockCode, yil, ay);
+    }
+
+    /**
+     * Cache'de bulunamayan hisse için MCP üzerinden hisse bazlı canlı sorgu yapar.
+     *
+     * <p>SQL injection koruması: stockCode {@code ^[A-Z0-9]{1,10}$} regex ile doğrulanır.
+     * MCP client veya token yoksa/geçersizse boş liste döner (graceful degradation).</p>
+     *
+     * @param stockCode hisse kodu (ör: "GARAN")
+     * @param yil       bilanço yılı filtresi (null ise filtre uygulanmaz)
+     * @param ay        bilanço ayı filtresi (null ise filtre uygulanmaz)
+     * @return MCP'den alınan finansal oran listesi, hata durumunda boş liste
+     */
+    private List<FinansalOranDto> fetchHisseOranlarFromMcp(String stockCode, Integer yil, Integer ay) {
+        if (mcpClient == null || tokenStore == null || !tokenStore.isTokenValid()) {
+            return Collections.emptyList();
+        }
+
+        String safeName = stockCode.trim().toUpperCase();
+        if (!safeName.matches("^[A-Z0-9]{1,10}$")) {
+            log.warn("[FINANSAL-ORAN] Geçersiz stockCode formatı: {}", stockCode);
+            return Collections.emptyList();
+        }
+
+        try {
+            StringBuilder sql = new StringBuilder();
+            sql.append("SELECT * FROM hisse_finansal_tablolari_finansal_oranlari ")
+               .append("WHERE hisse_senedi_kodu = '").append(safeName).append("' ");
+
+            if (yil != null && ay != null) {
+                sql.append("AND yil = ").append(yil).append(" AND ay = ").append(ay).append(" ");
+            }
+
+            sql.append("ORDER BY yil DESC, ay DESC, satir_no LIMIT 50");
+
+            JsonNode result = mcpClient.veriSorgula(sql.toString(), "Hisse oranları: " + safeName);
+            if (result == null) {
+                return Collections.emptyList();
+            }
+
+            String responseText = extractResponseText(result);
+            if (responseText == null || responseText.isBlank()) {
+                return Collections.emptyList();
+            }
+
+            List<FinansalOranDto> parsed = parseMarkdownTable(responseText);
+            log.debug("[FINANSAL-ORAN] MCP hisse fallback: {} için {} satır alındı", safeName, parsed.size());
+            return parsed;
+        } catch (Exception e) {
+            log.warn("[FINANSAL-ORAN] MCP hisse fallback hatası: {}", e.getMessage());
+            return Collections.emptyList();
+        }
     }
 
     /**

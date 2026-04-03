@@ -136,40 +136,134 @@ public class FinansalTabloService {
     /**
      * Belirtilen hissenin bilanço kalemlerini döndürür.
      *
+     * <p>Önce cache'den filtreler. Cache'de bulunamazsa hisse bazlı MCP sorgusu
+     * ile canlı veri çeker (graceful degradation).</p>
+     *
      * @param stockCode hisse kodu (ör: "GARAN")
      * @return bilanço DTO listesi, yoksa boş liste
      */
     public List<FinansalTabloDto> getHisseBilanco(String stockCode) {
-        return getFinansalTablolar().stream()
+        if (stockCode == null || stockCode.isBlank()) {
+            return Collections.emptyList();
+        }
+
+        List<FinansalTabloDto> cached = getFinansalTablolar().stream()
                 .filter(dto -> TABLO_BILANCO.equals(dto.getTabloTipi()))
                 .filter(dto -> stockCode.equalsIgnoreCase(dto.getHisseSenediKodu()))
                 .collect(Collectors.toList());
+
+        if (!cached.isEmpty()) {
+            return cached;
+        }
+
+        return fetchHisseTabloFromMcp(stockCode, "hisse_finansal_tablolari_bilanco_kalemleri",
+                TABLO_BILANCO, "hisse_senedi_kodu, yil, ay, satir_no, kalem, try_donemsel, usd_donemsel, eur_donemsel");
     }
 
     /**
      * Belirtilen hissenin gelir tablosu kalemlerini döndürür.
      *
+     * <p>Önce cache'den filtreler. Cache'de bulunamazsa hisse bazlı MCP sorgusu
+     * ile canlı veri çeker (graceful degradation).</p>
+     *
      * @param stockCode hisse kodu (ör: "GARAN")
      * @return gelir tablosu DTO listesi, yoksa boş liste
      */
     public List<FinansalTabloDto> getHisseGelirTablosu(String stockCode) {
-        return getFinansalTablolar().stream()
+        if (stockCode == null || stockCode.isBlank()) {
+            return Collections.emptyList();
+        }
+
+        List<FinansalTabloDto> cached = getFinansalTablolar().stream()
                 .filter(dto -> TABLO_GELIR.equals(dto.getTabloTipi()))
                 .filter(dto -> stockCode.equalsIgnoreCase(dto.getHisseSenediKodu()))
                 .collect(Collectors.toList());
+
+        if (!cached.isEmpty()) {
+            return cached;
+        }
+
+        return fetchHisseTabloFromMcp(stockCode, "hisse_finansal_tablolari_gelir_tablosu_kalemleri",
+                TABLO_GELIR, "hisse_senedi_kodu, yil, ay, satir_no, kalem, try_donemsel, usd_donemsel, eur_donemsel, "
+                        + "try_ceyreklik, usd_ceyreklik, eur_ceyreklik, try_ttm, usd_ttm, eur_ttm");
     }
 
     /**
      * Belirtilen hissenin nakit akım kalemlerini döndürür.
      *
+     * <p>Önce cache'den filtreler. Cache'de bulunamazsa hisse bazlı MCP sorgusu
+     * ile canlı veri çeker (graceful degradation).</p>
+     *
      * @param stockCode hisse kodu (ör: "GARAN")
      * @return nakit akım DTO listesi, yoksa boş liste
      */
     public List<FinansalTabloDto> getHisseNakitAkim(String stockCode) {
-        return getFinansalTablolar().stream()
+        if (stockCode == null || stockCode.isBlank()) {
+            return Collections.emptyList();
+        }
+
+        List<FinansalTabloDto> cached = getFinansalTablolar().stream()
                 .filter(dto -> TABLO_NAKIT_AKIM.equals(dto.getTabloTipi()))
                 .filter(dto -> stockCode.equalsIgnoreCase(dto.getHisseSenediKodu()))
                 .collect(Collectors.toList());
+
+        if (!cached.isEmpty()) {
+            return cached;
+        }
+
+        return fetchHisseTabloFromMcp(stockCode, "hisse_finansal_tablolari_nakit_akis_tablosu_kalemleri",
+                TABLO_NAKIT_AKIM, "hisse_senedi_kodu, yil, ay, satir_no, kalem, try_donemsel, usd_donemsel, eur_donemsel, "
+                        + "try_ceyreklik, usd_ceyreklik, eur_ceyreklik, try_ttm, usd_ttm, eur_ttm");
+    }
+
+    /**
+     * Cache'de bulunamayan hisse için MCP üzerinden hisse bazlı finansal tablo sorgusu yapar.
+     *
+     * <p>SQL injection koruması: stockCode {@code ^[A-Z0-9]{1,10}$} regex ile doğrulanır.
+     * MCP client veya token yoksa/geçersizse boş liste döner (graceful degradation).</p>
+     *
+     * @param stockCode  hisse kodu (ör: "GARAN")
+     * @param tabloAdi   MCP tablo adı (ör: "hisse_finansal_tablolari_bilanco_kalemleri")
+     * @param tabloTipi  DTO tablo tipi (BILANCO, GELIR, NAKIT_AKIM)
+     * @param kolonlar   SELECT kolonları
+     * @return MCP'den alınan finansal tablo listesi, hata durumunda boş liste
+     */
+    private List<FinansalTabloDto> fetchHisseTabloFromMcp(String stockCode, String tabloAdi,
+                                                           String tabloTipi, String kolonlar) {
+        if (mcpClient == null || tokenStore == null || !tokenStore.isTokenValid()) {
+            return Collections.emptyList();
+        }
+
+        String safeName = stockCode.trim().toUpperCase();
+        if (!safeName.matches("^[A-Z0-9]{1,10}$")) {
+            log.warn("[FINANSAL-TABLO] Geçersiz stockCode formatı: {}", stockCode);
+            return Collections.emptyList();
+        }
+
+        try {
+            String sql = "SELECT " + kolonlar + " FROM " + tabloAdi +
+                    " WHERE hisse_senedi_kodu = '" + safeName + "'" +
+                    " AND yil >= " + MIN_YEAR +
+                    " ORDER BY yil DESC, ay DESC, satir_no LIMIT 200";
+
+            JsonNode result = mcpClient.veriSorgula(sql, tabloTipi + " kalemleri: " + safeName);
+            if (result == null) {
+                return Collections.emptyList();
+            }
+
+            String responseText = extractResponseText(result);
+            if (responseText == null || responseText.isBlank()) {
+                return Collections.emptyList();
+            }
+
+            List<FinansalTabloDto> parsed = parseMarkdownTable(responseText, tabloTipi);
+            log.debug("[FINANSAL-TABLO] MCP hisse fallback: {} {} için {} satır alındı",
+                    safeName, tabloTipi, parsed.size());
+            return parsed;
+        } catch (Exception e) {
+            log.warn("[FINANSAL-TABLO] MCP hisse fallback hatası ({}): {}", tabloTipi, e.getMessage());
+            return Collections.emptyList();
+        }
     }
 
     /**
