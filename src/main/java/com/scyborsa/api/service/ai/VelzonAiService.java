@@ -6,9 +6,13 @@ import com.scyborsa.api.config.VelzonAiConfig;
 import com.scyborsa.api.dto.ai.TechnicalDataDTO;
 import com.scyborsa.api.dto.enrichment.FonPozisyon;
 import com.scyborsa.api.dto.enrichment.StockBrokerInfo;
+import com.scyborsa.api.dto.fintables.FinansalOranDto;
+import com.scyborsa.api.dto.fintables.GuidanceDto;
 import com.scyborsa.api.dto.screener.ScanBodyDefinition;
 import com.scyborsa.api.dto.screener.TvScreenerResponse;
+import com.scyborsa.api.service.enrichment.FinansalOranService;
 import com.scyborsa.api.service.enrichment.FintablesFonPozisyonService;
+import com.scyborsa.api.service.enrichment.GuidanceService;
 import com.scyborsa.api.service.enrichment.PerStockAKDService;
 import com.scyborsa.api.service.screener.TradingViewScreenerClient;
 import lombok.extern.slf4j.Slf4j;
@@ -95,6 +99,14 @@ public class VelzonAiService {
     @Autowired(required = false)
     private TradingViewScreenerClient tradingViewScreenerClient;
 
+    /** Sirket guidance (beklenti) servisi (opsiyonel — yoksa beklenti verisi atlanir). */
+    @Autowired(required = false)
+    private GuidanceService guidanceService;
+
+    /** Finansal oran servisi (opsiyonel — yoksa temel gosterge verisi atlanir). */
+    @Autowired(required = false)
+    private FinansalOranService finansalOranService;
+
     /**
      * Constructor — config ve objectMapper zorunlu bagimliliklari alir.
      *
@@ -163,7 +175,12 @@ public class VelzonAiService {
             return null;
         }
 
-        if (stockCode == null || !stockCode.matches("^[A-Z0-9]{2,6}$")) {
+        if (stockCode == null || stockCode.isBlank()) {
+            log.warn("[AI-SERVICE] Gecersiz hisse kodu formati: {}", stockCode);
+            return null;
+        }
+        stockCode = stockCode.trim().toUpperCase(java.util.Locale.ROOT);
+        if (!stockCode.matches("^[A-Z0-9]{2,6}$")) {
             log.warn("[AI-SERVICE] Gecersiz hisse kodu formati: {}", stockCode);
             return null;
         }
@@ -180,9 +197,16 @@ public class VelzonAiService {
             // AKD kurum dagitimi cek (opsiyonel)
             String akdBilgileri = getAkdBilgileriText(stockCode);
 
+            // Sirket beklentileri cek (opsiyonel)
+            String guidanceBilgileri = getGuidanceText(stockCode);
+
+            // Finansal oranlar cek (opsiyonel)
+            String finansalOranBilgileri = getFinansalOranText(stockCode);
+
             // User message olustur (zenginlestirilmis)
             String userMessage = buildEnrichedUserMessage(stockCode, price, changePercent,
-                    screenerNames, technicalData, fonPozisyonlari, akdBilgileri);
+                    screenerNames, technicalData, fonPozisyonlari, akdBilgileri,
+                    guidanceBilgileri, finansalOranBilgileri);
 
             log.info("[AI-SERVICE] Velzon AI analiz basliyor: {} | Fiyat: {} | Degisim: {}% | Teknik veri: {}",
                     stockCode, price, changePercent, technicalData != null ? "VAR" : "YOK");
@@ -335,11 +359,14 @@ public class VelzonAiService {
      * @param technicalData teknik veri DTO'su (opsiyonel)
      * @param fonPozisyonlari fon pozisyonlari text (opsiyonel)
      * @param akdBilgileri AKD kurum dagitimi text (opsiyonel)
+     * @param guidanceBilgileri sirket beklentileri text (opsiyonel)
+     * @param finansalOranBilgileri finansal oranlar text (opsiyonel)
      * @return AI prompt icin user message
      */
     private String buildEnrichedUserMessage(String stockCode, Double price, Double changePercent,
                                              List<String> screenerNames, TechnicalDataDTO technicalData,
-                                             String fonPozisyonlari, String akdBilgileri) {
+                                             String fonPozisyonlari, String akdBilgileri,
+                                             String guidanceBilgileri, String finansalOranBilgileri) {
         StringBuilder sb = new StringBuilder();
 
         sb.append("Hisse Analizi: ").append(stockCode).append("\n\n");
@@ -393,6 +420,18 @@ public class VelzonAiService {
         if (fonPozisyonlari != null && !fonPozisyonlari.isEmpty()) {
             sb.append("\nFON POZISYONLARI:\n");
             sb.append(fonPozisyonlari).append("\n");
+        }
+
+        // Sirket beklentileri (guidance)
+        if (guidanceBilgileri != null && !guidanceBilgileri.isEmpty()) {
+            sb.append("\n📋 ŞİRKET BEKLENTİLERİ:\n");
+            sb.append(guidanceBilgileri).append("\n");
+        }
+
+        // Finansal oranlar (temel gostergeler)
+        if (finansalOranBilgileri != null && !finansalOranBilgileri.isEmpty()) {
+            sb.append("\n📊 TEMEL GÖSTERGELER:\n");
+            sb.append(finansalOranBilgileri).append("\n");
         }
 
         return sb.toString();
@@ -456,6 +495,94 @@ public class VelzonAiService {
 
         } catch (Exception e) {
             log.debug("[AI-SERVICE] AKD bilgileri alinamadi ({}): {}", stockCode, e.getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Sirket guidance (beklenti) bilgilerini text olarak alir.
+     *
+     * @param stockCode hisse kodu
+     * @return formatli guidance text veya null
+     */
+    private String getGuidanceText(String stockCode) {
+        if (guidanceService == null) {
+            return null;
+        }
+
+        try {
+            List<GuidanceDto> guidanceList = guidanceService.getHisseGuidance(stockCode);
+            if (guidanceList == null || guidanceList.isEmpty()) {
+                return null;
+            }
+
+            // Son guidance'i al (liste yila gore azalan sirada)
+            return guidanceList.stream()
+                    .limit(3)
+                    .map(g -> String.format("- %s (%s): %s",
+                            stockCode,
+                            g.getYil() != null ? g.getYil().toString() : "?",
+                            g.getBeklentiler() != null ? g.getBeklentiler() : "N/A"))
+                    .collect(Collectors.joining("\n"));
+
+        } catch (Exception e) {
+            log.debug("[AI-SERVICE] Guidance bilgileri alinamadi ({}): {}", stockCode, e.getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Finansal oranlari text olarak alir (son donem F/K, PD/DD, ROE vb.).
+     *
+     * @param stockCode hisse kodu
+     * @return formatli finansal oran text veya null
+     */
+    private String getFinansalOranText(String stockCode) {
+        if (finansalOranService == null) {
+            return null;
+        }
+
+        try {
+            List<FinansalOranDto> oranlar = finansalOranService.getHisseOranlar(stockCode);
+            if (oranlar == null || oranlar.isEmpty()) {
+                return null;
+            }
+
+            // Son donemin oranlarini bul (en yuksek yil/ay)
+            Integer maxYil = oranlar.stream()
+                    .map(FinansalOranDto::getYil)
+                    .filter(y -> y != null)
+                    .max(Integer::compareTo)
+                    .orElse(null);
+            if (maxYil == null) {
+                return null;
+            }
+
+            Integer maxAy = oranlar.stream()
+                    .filter(o -> maxYil.equals(o.getYil()))
+                    .map(FinansalOranDto::getAy)
+                    .filter(a -> a != null)
+                    .max(Integer::compareTo)
+                    .orElse(null);
+            if (maxAy == null) {
+                return null;
+            }
+
+            // Son donemin oranlarini filtrele ve formatla
+            String formatted = oranlar.stream()
+                    .filter(o -> maxYil.equals(o.getYil()) && maxAy.equals(o.getAy()))
+                    .filter(o -> o.getOran() != null && o.getDeger() != null)
+                    .map(o -> String.format("%s=%.2f", o.getOran(), o.getDeger()))
+                    .collect(Collectors.joining(", "));
+
+            if (formatted.isEmpty()) {
+                return null;
+            }
+
+            return String.format("Dönem: %d/%d aylik | %s", maxYil, maxAy, formatted);
+
+        } catch (Exception e) {
+            log.debug("[AI-SERVICE] Finansal oranlar alinamadi ({}): {}", stockCode, e.getMessage());
             return null;
         }
     }

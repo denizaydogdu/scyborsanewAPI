@@ -4,10 +4,13 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.scyborsa.api.dto.bilanco.*;
+import com.scyborsa.api.dto.fintables.FinansalTabloDto;
 import com.scyborsa.api.service.KatilimEndeksiService;
 import com.scyborsa.api.service.client.GateVelzonApiClient;
+import com.scyborsa.api.service.enrichment.FinansalTabloService;
 import com.scyborsa.api.utils.BistCacheUtils;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
@@ -28,7 +31,7 @@ import java.util.concurrent.ConcurrentHashMap;
  *   <li><b>Rasyo verileri:</b> Seans ici 10 dakika, seans disi 2 saat</li>
  * </ul>
  *
- * <p>Hata durumunda mevcut cache korunur, yeni veri cekilemezse null/bos liste doner.</p>
+ * <p>Hata durumunda mevcut cache korunur, yeni veri çekilemezse null/boş liste döner.</p>
  *
  * @see GateVelzonApiClient
  * @see com.scyborsa.api.controller.BilancoController
@@ -40,6 +43,10 @@ public class BilancoService {
     private final GateVelzonApiClient gateVelzonApiClient;
     private final ObjectMapper objectMapper;
     private final KatilimEndeksiService katilimEndeksiService;
+
+    /** Finansal tablo servisi — MCP fallback için (opsiyonel, graceful degradation). */
+    @Autowired(required = false)
+    private FinansalTabloService finansalTabloService;
 
     /** Son bilanco raporlari listesi — volatile cache. */
     private volatile List<SonBilancoRaporDto> cachedSonRaporlar;
@@ -181,13 +188,126 @@ public class BilancoService {
     // ── Bireysel Raporlar ──
 
     /**
-     * Belirtilen sembolun bilancosunu dondurur.
+     * Belirtilen sembolün bilançosunu döndürür.
+     *
+     * <p>Birincil kaynak: gate.velzon.tr REST API. Başarısız olursa ve
+     * {@link FinansalTabloService} mevcutsa MCP fallback denenir.</p>
      *
      * @param symbol hisse sembolu (orn. "GARAN")
      * @return bilanco verisi; hata durumunda null
      */
     public BilancoDataDto getBilanco(String symbol) {
-        return getCachedReport(symbol, "bilanco", "/api/bilanco/" + symbol.toUpperCase(Locale.ROOT));
+        BilancoDataDto result = getCachedReport(symbol, "bilanco", "/api/bilanco/" + symbol.toUpperCase(Locale.ROOT));
+
+        // gate.velzon.tr başarılı olduysa direkt dön
+        if (result != null) {
+            return result;
+        }
+
+        // MCP fallback: FinansalTabloService üzerinden bilanço verisi dene
+        return tryMcpBilancoFallback(symbol);
+    }
+
+    /**
+     * MCP üzerinden bilanço verisi fallback denemesi.
+     *
+     * <p>{@link FinansalTabloService#getHisseBilanco(String)} kullanarak
+     * Fintables MCP'den bilanço kalemlerini çeker ve {@link BilancoDataDto}'ya dönüştürür.</p>
+     *
+     * @param symbol hisse sembolü
+     * @return bilanço verisi; MCP kullanılamıyorsa veya hata durumunda null
+     */
+    private BilancoDataDto tryMcpBilancoFallback(String symbol) {
+        if (finansalTabloService == null) {
+            return null;
+        }
+
+        try {
+            log.info("[BILANCO] gate.velzon.tr başarısız, MCP fallback deneniyor: {}", symbol);
+            List<FinansalTabloDto> bilancoKalemleri = finansalTabloService.getHisseBilanco(symbol);
+            if (bilancoKalemleri == null || bilancoKalemleri.isEmpty()) {
+                log.debug("[BILANCO] MCP fallback boş sonuç döndürdü: {}", symbol);
+                return null;
+            }
+
+            // MCP bilanço kalemlerini BilancoDataDto'ya dönüştür
+            BilancoDataDto dto = convertMcpToBilancoData(bilancoKalemleri, symbol);
+            if (dto != null) {
+                // MCP fallback sonucu cache'lenmez — yapısal olarak degraded (period, consolidation, link null).
+                // Bir sonraki istekte gate.velzon.tr tekrar denenecek.
+                log.info("[BILANCO] MCP fallback başarılı (cache'lenmedi): {} ({} kalem)", symbol, bilancoKalemleri.size());
+            }
+            return dto;
+        } catch (Exception e) {
+            log.warn("[BILANCO] MCP fallback hatası: {}, hata={}", symbol, e.getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * MCP finansal tablo DTO listesini BilancoDataDto'ya dönüştürür.
+     *
+     * <p>Fintables MCP bilanço kalemleri satır numarasına göre sıralıdır.
+     * En güncel dönem (ilk yıl-ay grubu) kullanılır.</p>
+     *
+     * @param kalemleri MCP bilanço kalemleri
+     * @param symbol    hisse sembolü
+     * @return BilancoDataDto; dönüştürülemezse null
+     */
+    private BilancoDataDto convertMcpToBilancoData(List<FinansalTabloDto> kalemleri, String symbol) {
+        if (kalemleri == null || kalemleri.isEmpty()) {
+            return null;
+        }
+
+        try {
+            // MCP kalemleri satır numarasına göre sıralı gelir — BilancoTableItemDto listesine dönüştür
+            List<BilancoTableItemDto> tableItems = new ArrayList<>();
+            Integer firstYear = null;
+            Integer firstMonth = null;
+
+            for (FinansalTabloDto kalem : kalemleri) {
+                // Sadece ilk dönemi al (en güncel)
+                if (firstYear == null) {
+                    firstYear = kalem.getYil();
+                    firstMonth = kalem.getAy();
+                } else if (!Objects.equals(firstYear, kalem.getYil()) || !Objects.equals(firstMonth, kalem.getAy())) {
+                    break;
+                }
+
+                Double numericAmount = kalem.getTryDonemsel() != null ? kalem.getTryDonemsel().doubleValue() : null;
+
+                BilancoValueDto value = BilancoValueDto.builder()
+                        .numericAmount(numericAmount)
+                        .currency("TRY")
+                        .build();
+
+                tableItems.add(BilancoTableItemDto.builder()
+                        .name(kalem.getKalem())
+                        .value(value)
+                        .numericValue(numericAmount)
+                        .build());
+            }
+
+            if (tableItems.isEmpty()) {
+                return null;
+            }
+
+            String donemStr = firstYear + "/" + firstMonth;
+
+            BilancoTablesDto tables = BilancoTablesDto.builder()
+                    .tableTypeName("Bilanço (MCP)")
+                    .tableItems(tableItems)
+                    .build();
+
+            return BilancoDataDto.builder()
+                    .title(symbol.toUpperCase(Locale.ROOT) + " " + donemStr + " Bilanço")
+                    .year(firstYear)
+                    .tables(tables)
+                    .build();
+        } catch (Exception e) {
+            log.warn("[BILANCO] MCP bilanço dönüşüm hatası: {}", symbol, e);
+            return null;
+        }
     }
 
     /**

@@ -154,6 +154,12 @@ django:
     connect-timeout-seconds: 10
     request-timeout-seconds: 30
 
+# Fintables MCP OAuth 2.0 (PKCE)
+# callback-url: Production'da application-prod.yml'de override edilmeli: https://scyborsa.com/api/v1/fintables/callback
+# fintables:
+#   mcp:
+#     callback-url: https://scyborsa.com/api/v1/fintables/callback
+
 haber:
   sync:
     enabled: true

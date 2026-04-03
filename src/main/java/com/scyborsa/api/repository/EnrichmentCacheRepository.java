@@ -69,4 +69,20 @@ public interface EnrichmentCacheRepository extends JpaRepository<EnrichmentCache
     @Transactional
     @Query("DELETE FROM EnrichmentCache e WHERE e.cacheDate < :cutoffDate")
     int deleteOlderThan(@Param("cutoffDate") LocalDate cutoffDate);
+
+    /**
+     * Belirtilen veri tipi ve tarihten eski cache kayıtlarını siler.
+     *
+     * <p>Tip bazlı temizleme için kullanılır (örn. sadece VBTS_TEDBIR kayıtları).</p>
+     *
+     * @param dataType   silinecek veri tipi
+     * @param cutoffDate bu tarihten önceki kayıtlar silinir
+     * @return silinen kayıt sayısı
+     */
+    @Modifying
+    @Transactional
+    @Query("DELETE FROM EnrichmentCache e WHERE e.dataType = :dataType AND e.cacheDate < :cutoffDate")
+    int deleteByDataTypeOlderThan(
+            @Param("dataType") EnrichmentDataTypeEnum dataType,
+            @Param("cutoffDate") LocalDate cutoffDate);
 }
