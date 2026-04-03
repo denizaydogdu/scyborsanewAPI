@@ -45,8 +45,9 @@ public class KapHaberSinyalService {
     /** StockCode regex doğrulama (SQL injection koruması). */
     private static final Pattern STOCK_CODE_PATTERN = Pattern.compile("^[A-Z0-9]{1,10}$");
 
-    /** JSON parser. */
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    /** JSON parser (Spring Boot auto-configured). */
+    @Autowired
+    private ObjectMapper objectMapper;
 
     /** Tarih çıkarma regex (yyyy-MM-dd veya dd.MM.yyyy formatları). */
     private static final Pattern DATE_PATTERN_ISO = Pattern.compile("(\\d{4}-\\d{2}-\\d{2})");

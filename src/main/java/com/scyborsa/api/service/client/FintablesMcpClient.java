@@ -146,7 +146,7 @@ public class FintablesMcpClient {
      * @throws RuntimeException      MCP çağrısı başarısız olursa
      */
     public JsonNode dokumanlardaAra(String query) {
-        return dokumanlardaAra(query, query, null, 8);
+        return dokumanlardaAra("Doküman havuzunda arama", query, null, 8);
     }
 
     /**
@@ -158,7 +158,9 @@ public class FintablesMcpClient {
      * @throws RuntimeException      MCP çağrısı başarısız olursa
      */
     public JsonNode dokumanChunkYukle(List<String> ids) {
-        Map<String, Object> arguments = Map.of("ids", ids);
+        Map<String, Object> arguments = new HashMap<>();
+        arguments.put("ids", ids);
+        arguments.put("purpose", "Doküman chunk içeriği yükleniyor");
         return callTool("dokuman_chunk_yukle", arguments);
     }
 
