@@ -135,8 +135,7 @@ public class AcigaSatisSyncJob {
 
         try {
             String sql = "SELECT * FROM gunluk_aciga_satis_istatistikleri " +
-                    "WHERE tarih_europe_istanbul = '" + todayStr + "' " +
-                    "ORDER BY aciga_satis_hacmi_tl DESC";
+                    "ORDER BY tarih_europe_istanbul DESC, aciga_satis_hacmi_tl DESC LIMIT 50";
 
             JsonNode result = mcpClient.veriSorgula(sql, "Günlük açığa satış istatistikleri");
 

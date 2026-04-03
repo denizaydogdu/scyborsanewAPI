@@ -179,7 +179,7 @@ public class AcigaSatisService {
             // Header satırından kolon indekslerini bul
             String[] headers = parseMdRow(lines[0]);
             int idxKod = findColumnIndex(headers, "hisse_senedi_kodu");
-            int idxTarih = findColumnIndex(headers, "tarih");
+            int idxTarih = findColumnIndex(headers, "tarih_europe_istanbul");
             int idxOrtFiyat = findColumnIndex(headers, "ortalama_aciga_satis_fiyati");
             int idxEnYuksek = findColumnIndex(headers, "en_yuksek_aciga_satis_fiyati");
             int idxEnDusuk = findColumnIndex(headers, "en_dusuk_aciga_satis_fiyati");
