@@ -11,6 +11,7 @@ import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -62,8 +63,9 @@ public class GuidanceController {
      */
     @GetMapping(value = "/{stockCode}/raw", produces = MediaType.TEXT_PLAIN_VALUE)
     public ResponseEntity<String> getRawGuidance(
-            @PathVariable @Pattern(regexp = "^[A-Z0-9]{1,10}$", message = "Gecersiz hisse kodu") String stockCode) {
-        String rawText = guidanceService.getRawGuidance(stockCode);
+            @PathVariable @Pattern(regexp = "^[A-Z0-9]{1,10}$", message = "Geçersiz hisse kodu") String stockCode,
+            @RequestParam(required = false) Integer yil) {
+        String rawText = guidanceService.getRawGuidance(stockCode, yil);
         if (rawText == null || rawText.isBlank()) {
             return ResponseEntity.noContent().build();
         }

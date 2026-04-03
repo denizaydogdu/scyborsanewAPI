@@ -182,7 +182,7 @@ public class GuidanceService {
      * @param stockCode hisse kodu (or: "THYAO")
      * @return MCP response'undaki raw tablo metni, hata durumunda null
      */
-    public String getRawGuidance(String stockCode) {
+    public String getRawGuidance(String stockCode, Integer yil) {
         if (stockCode == null || stockCode.isBlank()) {
             return null;
         }
@@ -190,18 +190,22 @@ public class GuidanceService {
         // SQL injection guard
         String safeName = stockCode.trim().toUpperCase();
         if (!VALID_STOCK_CODE.matcher(safeName).matches()) {
-            log.warn("[GUIDANCE] Gecersiz hisse kodu: {}", stockCode);
+            log.warn("[GUIDANCE] Geçersiz hisse kodu: {}", stockCode);
             return null;
         }
 
         if (!tokenStore.isTokenValid()) {
-            log.warn("[GUIDANCE] MCP token gecersiz, raw guidance alinamadi: {}", safeName);
+            log.warn("[GUIDANCE] MCP token geçersiz, raw guidance alınamadı: {}", safeName);
             return null;
         }
 
         try {
             String sql = "SELECT hisse_senedi_kodu, yil, beklentiler FROM guidance WHERE hisse_senedi_kodu = '"
-                    + safeName + "' ORDER BY yil DESC";
+                    + safeName + "'";
+            if (yil != null) {
+                sql += " AND yil = " + yil;
+            }
+            sql += " ORDER BY yil DESC";
 
             JsonNode result = mcpClient.veriSorgula(sql, "Guidance detay: " + safeName);
             if (result == null) {
