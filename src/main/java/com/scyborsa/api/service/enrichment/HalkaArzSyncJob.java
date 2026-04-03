@@ -123,8 +123,14 @@ public class HalkaArzSyncJob {
         log.info("[HALKA-ARZ-SYNC] Başlıyor: tarih={}", today);
 
         try {
-            String sql = "SELECT * FROM halka_arzlar " +
-                    "ORDER BY talep_toplama_baslangic_tarihi_europe_istanbul DESC LIMIT 100";
+            String sql = "SELECT hisse_senedi_kodu, baslik, " +
+                    "talep_toplama_baslangic_tarihi_europe_istanbul, talep_toplama_bitis_tarihi_europe_istanbul, " +
+                    "ilk_islem_tarihi_europe_istanbul, halka_arz_fiyati, duzeltilmis_halka_arz_fiyati, " +
+                    "pay_adedi, ek_pay_adedi, araci_kurum, katilim_endeksi_uygun_mu, " +
+                    "katilimci_sayisi, durum_kodu, yilliklandirilmis_kar, " +
+                    "halka_arz_sonrasi_odenmis_sermaye, iskonto_orani, net_kar, favok, net_borc " +
+                    "FROM halka_arzlar " +
+                    "ORDER BY ilk_islem_tarihi_europe_istanbul DESC NULLS LAST LIMIT 500";
 
             JsonNode result = mcpClient.veriSorgula(sql, "Halka arz verileri");
 

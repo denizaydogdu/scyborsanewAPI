@@ -80,8 +80,14 @@ public class HalkaArzService {
         }
 
         try {
-            String sql = "SELECT * FROM halka_arzlar " +
-                    "ORDER BY talep_toplama_baslangic_tarihi_europe_istanbul DESC LIMIT 100";
+            String sql = "SELECT hisse_senedi_kodu, baslik, " +
+                    "talep_toplama_baslangic_tarihi_europe_istanbul, talep_toplama_bitis_tarihi_europe_istanbul, " +
+                    "ilk_islem_tarihi_europe_istanbul, halka_arz_fiyati, duzeltilmis_halka_arz_fiyati, " +
+                    "pay_adedi, ek_pay_adedi, araci_kurum, katilim_endeksi_uygun_mu, " +
+                    "katilimci_sayisi, durum_kodu, yilliklandirilmis_kar, " +
+                    "halka_arz_sonrasi_odenmis_sermaye, iskonto_orani, net_kar, favok, net_borc " +
+                    "FROM halka_arzlar " +
+                    "ORDER BY ilk_islem_tarihi_europe_istanbul DESC NULLS LAST LIMIT 500";
 
             JsonNode result = mcpClient.veriSorgula(sql, "Halka arz verileri (canlı)");
             if (result == null) {
@@ -109,11 +115,22 @@ public class HalkaArzService {
      * @return aktif halka arz DTO listesi, yoksa boş liste
      */
     public List<HalkaArzDto> getAktifHalkaArzlar() {
+        String today = java.time.LocalDate.now(java.time.ZoneId.of("Europe/Istanbul")).toString();
         return getHalkaArzlar().stream()
-                .filter(dto -> dto.getDurumKodu() != null
-                        && !"tamamlandi".equalsIgnoreCase(dto.getDurumKodu())
-                        && !"iptal".equalsIgnoreCase(dto.getDurumKodu()))
-                .collect(Collectors.toList());
+                .filter(dto -> {
+                    // Talep bitiş tarihi bugün veya sonrası olan IPO'lar aktif
+                    String bitis = dto.getTalepToplamaBitisTarihi();
+                    if (bitis != null && bitis.length() >= 10) {
+                        return bitis.substring(0, 10).compareTo(today) >= 0;
+                    }
+                    // Talep başlangıç tarihi olan ama bitiş tarihi olmayan — henüz başlamamış
+                    String baslangic = dto.getTalepToplamaBaslangicTarihi();
+                    if (baslangic != null && baslangic.length() >= 10) {
+                        return baslangic.substring(0, 10).compareTo(today) >= 0;
+                    }
+                    return false;
+                })
+                .collect(java.util.stream.Collectors.toList());
     }
 
     /**
