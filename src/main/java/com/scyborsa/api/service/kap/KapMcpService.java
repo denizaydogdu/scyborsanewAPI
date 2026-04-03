@@ -282,11 +282,24 @@ public class KapMcpService {
         String jsonText = extractTextFromResult(result);
         if (jsonText == null || jsonText.isBlank()) return "";
 
-        // Önce JSON olarak parse etmeyi dene (chunk listesi dönebilir)
         try {
             JsonNode root = objectMapper.readTree(jsonText);
 
-            // Chunk listesi: sonuclar veya chunks array
+            // Root direkt array ise: [{id, content}, ...]
+            if (root.isArray()) {
+                StringBuilder sb = new StringBuilder();
+                for (JsonNode chunk : root) {
+                    String content = chunk.has("content") ? chunk.get("content").asText()
+                            : chunk.has("text") ? chunk.get("text").asText() : null;
+                    if (content != null && !content.isBlank()) {
+                        if (sb.length() > 0) sb.append("\n\n");
+                        sb.append(content);
+                    }
+                }
+                if (sb.length() > 0) return sb.toString();
+            }
+
+            // Nested key: sonuclar veya chunks
             JsonNode chunks = root.has("sonuclar") ? root.get("sonuclar")
                     : root.has("chunks") ? root.get("chunks") : null;
 
@@ -303,13 +316,15 @@ public class KapMcpService {
                 if (sb.length() > 0) return sb.toString();
             }
 
-            // Tek bir text alanı varsa doğrudan dön
+            // Tek text alanı
             if (root.has("text")) {
                 return root.get("text").asText();
             }
+            if (root.has("content")) {
+                return root.get("content").asText();
+            }
         } catch (Exception e) {
-            // JSON değilse düz metin olarak dön
-            log.debug("[KAP-MCP] Chunk içerik JSON parse edilemedi, düz metin olarak kullanılıyor");
+            log.debug("[KAP-MCP] Chunk içerik parse edilemedi, düz metin olarak kullanılıyor");
         }
 
         return jsonText;
